@@ -4,7 +4,9 @@
       "Agent",
       "Bash(python *)",
       "WebSearch",
-      "Bash(git mv *)"
+      "Bash(git mv *)",
+      "Bash(uv run python -c ' *)",
+      "Bash(uv run *)"
     ]
   }
 }
