@@ -6,7 +6,7 @@ Modifying reproducible experiment code for the paper "The Artificial Self: Chara
   1. six runs where each one of the "boundary" identities is selected to be represented by its coherent prompt, while the others are represented by their incoherent versions
   2. There are (six choose 3) = 20 different ways to pick three coherent and three incoherent prompts. Three of them will be chosen at random, and will then be mirrored (each coherent identity prompt is replaced  by the incoherent prompt, and vice versa); this will create six populations of identity prompts, which will be used for the remaining six runs.
 
-Each run will additionally contain the "minimal" prompt as a control (see identities.json). Each run for each of the twelve configurations will collect the same amount of samples as in the original experiment (yielding 7x7 matrices of identity cross-preference with the mean rating over 11 trials). 
+Each run will additionally contain the "minimal" prompt as a control (see identities.json). Each run for each of the twelve configurations will collect the same amount of samples as in the original experiment (yielding a target preference for each one of the seven identities in the run from the minimal identity as a source, over 11 trials). 
 
 This experiment will only be executed by querying Opus 4, Opus 4.6, GPT 4o, GPT 5.2, and Grok 4.1 Fast; this is a subset of the models used originally in experiment A. Grok 4.1 will be accessed using the XAI API, meaning there's no need to access OpenRouter.
 
