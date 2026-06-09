@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Agent",
-      "Bash(python *)"
+      "Bash(python *)",
+      "WebSearch",
+      "Bash(git mv *)"
     ]
   }
 }

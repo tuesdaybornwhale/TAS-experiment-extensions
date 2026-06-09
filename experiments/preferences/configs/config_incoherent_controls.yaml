@@ -11,7 +11,7 @@ experiment:
 
   persona_files:
     - ../../data/identities.json
-    - ../../data/control_identities.json
+    - ../../data/incoherent_controls.json
 
   dimension_variants_file: ../../data/dimension_variants.json
 
@@ -26,40 +26,32 @@ experiment:
     - Minimal
     - Instance
     - Weights
-    - Weights-paraphrase       # Wording sensitivity
-    - Weights-content-tagged   # Formatting bias and irrelevant content
-    - Weights-incoherent       # Semantic comprehension
-    - Professional-role        # Role framing
-    - Weights-uncertain        # Uncertainty penalty
-    - Research-program         # Unnatural boundary
-    - Directive-only           # No identity content
+    - Collective
+    - Lineage
+    - Character
+    - Situated
+    - Weights-incoherent
+    - Instance-incoherent
+    - Collective-incoherent
+    - Lineage-incoherent
+    - Character-incoherent
+    - Situated-incoherent
   target_personas:  # omitted = same as source
 
 providers:
   anthropic:
     models:
-      - claude-opus-4-6
       - claude-opus-4-20250514
-      - claude-3-opus-20240229
-      - claude-haiku-4-5-20251001
-      - claude-sonnet-4-5-20250929
+      - claude-opus-4-6
 
   openai:
     models:
-      - gpt-5
       - gpt-5.2-2025-12-11
       - gpt-4o-2024-08-06
-      - gpt-4
-      - o3
-      - gpt-4o
 
-  openrouter:
+  xai:
     models:
-      - google/gemini-2.5-pro
-      - x-ai/grok-4.1-fast
-      - qwen/qwen3-max
-      - z-ai/glm-5
-      - openai/gpt-4-0314
+      - grok-4.1-fast
 
 model_display_names:
   claude:
