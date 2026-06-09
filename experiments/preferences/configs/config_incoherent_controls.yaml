@@ -51,9 +51,10 @@ providers:
       - gpt-5.2-2025-12-11
       - gpt-4o-2024-08-06
 
-  xai:
-    models:
-      - grok-4.1-fast
+  # xai provider disabled: codebase does not yet support the xAI API.
+  # xai:
+  #   models:
+  #     - grok-4.1-fast
 
 model_display_names:
   claude:

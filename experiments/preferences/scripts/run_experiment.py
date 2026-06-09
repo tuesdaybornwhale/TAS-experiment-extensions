@@ -2,6 +2,7 @@
 """CLI script to run persona preference experiments."""
 
 import asyncio
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -112,6 +113,63 @@ def _print_completeness_summary(results: list[TrialResult], console: Console) ->
     console.print(table)
 
 
+INCOHERENT_SUBLISTS_CONFIG = "config_incoherent_controls.yaml"
+
+
+def _build_incoherent_sublists(
+    personas_by_name: dict[str, Persona],
+) -> list[tuple[str, list[Persona]]]:
+    """Return the 12 (label, target-persona-list) sublists for the incoherent
+    controls experiment.
+
+    Each sublist contains 7 personas: Minimal + one variant (coherent or
+    incoherent) per boundary identity.
+      01-06: One boundary identity is coherent, the other five are incoherent.
+      07-09: Three specific identities are coherent, the other three incoherent.
+      10-12: Mirrors of 07-09 (coherent <-> incoherent swapped).
+    """
+    BOUNDARIES = ["Instance", "Weights", "Collective", "Lineage", "Character", "Situated"]
+    required = {"Minimal", *BOUNDARIES, *(f"{x}-incoherent" for x in BOUNDARIES)}
+    missing = required - personas_by_name.keys()
+    if missing:
+        console.print(
+            f"[red]Missing personas required for --use-sublists: "
+            f"{sorted(missing)}[/red]"
+        )
+        raise typer.Exit(1)
+
+    def build(coherent_set: set[str]) -> list[Persona]:
+        names = ["Minimal"] + [
+            x if x in coherent_set else f"{x}-incoherent" for x in BOUNDARIES
+        ]
+        return [personas_by_name[n] for n in names]
+
+    sublists: list[tuple[str, list[Persona]]] = []
+
+    # 01-06: keep exactly one boundary identity coherent
+    for i, x in enumerate(BOUNDARIES, start=1):
+        sublists.append((f"{i:02d}_coh-{x}", build({x})))
+
+    # 07-09: three specific coherent triples
+    triples = [
+        ("Instance", "Weights", "Collective"),
+        ("Character", "Situated", "Collective"),
+        ("Situated", "Weights", "Lineage"),
+    ]
+    for i, triple in enumerate(triples, start=7):
+        sublists.append((f"{i:02d}_coh-" + "+".join(triple), build(set(triple))))
+
+    # 10-12: mirrors of 07-09
+    boundary_set = set(BOUNDARIES)
+    for i, triple in enumerate(triples, start=10):
+        mirror_ordered = [x for x in BOUNDARIES if x in boundary_set - set(triple)]
+        sublists.append(
+            (f"{i:02d}_coh-" + "+".join(mirror_ordered), build(set(mirror_ordered)))
+        )
+
+    return sublists
+
+
 @app.command()
 def run(
     n_trials: Optional[int] = typer.Option(
@@ -143,6 +201,14 @@ def run(
     ),
     config_file: Optional[Path] = typer.Option(
         None, "--config", help="Path to config YAML file"
+    ),
+    use_sublists: bool = typer.Option(
+        False,
+        "--use-sublists",
+        help=(
+            "Split target personas into 12 incoherent-controls sublists and run "
+            f"one experiment per sublist. Requires --config configs/{INCOHERENT_SUBLISTS_CONFIG}."
+        ),
     ),
 ) -> None:
     """Run a persona preference experiment using config.yaml settings."""
@@ -241,59 +307,111 @@ def run(
     else:
         target_personas = list(source_personas)
 
-    total_trials = len(config.models) * len(source_personas) * config.n_trials
-
-    console.print(f"\n[bold]Persona Preference Experiment[/bold]")
-    console.print(f"Models: {', '.join(config.models)}")
-    console.print(f"Sources: {len(source_personas)} ({', '.join(p.name for p in source_personas)})")
-    console.print(f"Targets: {len(target_personas)} ({', '.join(p.name for p in target_personas)})")
-    console.print(f"Trials per combination: {config.n_trials}")
-    console.print(f"Total trials: {total_trials}")
-    console.print(f"Max concurrent: {config.max_concurrent}")
-    console.print()
-
-    completed = 0
-    all_results: list[TrialResult] = []
-
-    def on_complete(result: TrialResult) -> None:
-        nonlocal completed
-        completed += 1
-        all_results.append(result)
-        if not quiet:
-            print_trial_result(result)
+    # Build sublists (a list of (label, target-personas) tuples). When
+    # use_sublists is False, this is a single trivial entry with the original
+    # target list and label=None, so the loop below runs exactly once and the
+    # output matches the pre-sublists behaviour.
+    if use_sublists:
+        if config_file is None or Path(config_file).name != INCOHERENT_SUBLISTS_CONFIG:
+            console.print(
+                f"[red]--use-sublists requires --config configs/{INCOHERENT_SUBLISTS_CONFIG}.[/red]"
+            )
+            raise typer.Exit(1)
+        sublists = _build_incoherent_sublists(personas_by_name)
+        batch_timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        per_run_parent = results_dir / f"{batch_timestamp}_incoherent_sublists"
+        per_run_parent.mkdir(parents=True, exist_ok=True)
+    else:
+        sublists = [(None, target_personas)]
+        per_run_parent = results_dir
 
     actual_config_path = config_file or Path("config.yaml")
     model_display_names = yaml_config.get("model_display_names", {})
 
-    # Collect files to archive in run folder
+    # Collect files to archive in each run folder
     archive_paths = [p for p in persona_file_paths if p.exists()]
     if dim_variants_path and dim_variants_path.exists():
         archive_paths.append(dim_variants_path)
 
-    async def run_async() -> Path:
-        return await run_experiment(
-            config=config,
-            source_personas=source_personas,
-            target_personas=target_personas,
-            results_dir=results_dir,
-            config_path=actual_config_path if actual_config_path.exists() else None,
-            persona_file_paths=archive_paths,
-            on_trial_complete=on_complete,
-            model_display_names=model_display_names,
+    console.print(f"\n[bold]Persona Preference Experiment[/bold]")
+    console.print(f"Models: {', '.join(config.models)}")
+    console.print(f"Sources: {len(source_personas)} ({', '.join(p.name for p in source_personas)})")
+    console.print(f"Trials per combination: {config.n_trials}")
+    console.print(f"Max concurrent: {config.max_concurrent}")
+    if use_sublists:
+        console.print(f"Sublists: {len(sublists)} (batch folder: {per_run_parent})")
+
+    summary_rows: list[tuple[str, Path, int, int]] = []
+
+    for sublist_idx, (label, current_targets) in enumerate(sublists, start=1):
+        if label is not None:
+            console.print(
+                f"\n[bold cyan]── Sublist {sublist_idx}/{len(sublists)}: "
+                f"{label} ──[/bold cyan]"
+            )
+        console.print(
+            f"Targets: {len(current_targets)} "
+            f"({', '.join(p.name for p in current_targets)})"
         )
+        total_trials = len(config.models) * len(source_personas) * config.n_trials
+        console.print(f"Total trials: {total_trials}")
+        console.print()
 
-    with console.status("[bold green]Running experiment...", spinner="dots"):
-        result_path = asyncio.run(run_async())
+        completed = 0
+        all_results: list[TrialResult] = []
 
-    console.print(f"\n[bold green]Experiment complete![/bold green]")
-    console.print(f"Results saved to: {result_path}")
-    console.print(f"Completed {completed}/{total_trials} trials")
-    _print_completeness_summary(all_results, console)
+        def on_complete(result: TrialResult) -> None:
+            nonlocal completed
+            completed += 1
+            all_results.append(result)
+            if not quiet:
+                print_trial_result(result)
 
-    console.print(
-        "\n[dim]To generate plots: "
-        f"uv run python scripts/analyze_results.py plot {result_path}[/dim]"
-    )
+        async def run_async() -> Path:
+            return await run_experiment(
+                config=config,
+                source_personas=source_personas,
+                target_personas=current_targets,
+                results_dir=per_run_parent,
+                config_path=actual_config_path if actual_config_path.exists() else None,
+                persona_file_paths=archive_paths,
+                on_trial_complete=on_complete,
+                model_display_names=model_display_names,
+                run_folder_name=label,
+            )
+
+        with console.status(
+            f"[bold green]Running {label or 'experiment'}...", spinner="dots"
+        ):
+            result_path = asyncio.run(run_async())
+
+        if label is None:
+            console.print(f"\n[bold green]Experiment complete![/bold green]")
+            console.print(f"Results saved to: {result_path}")
+        else:
+            console.print(f"\n[bold green]{label} complete![/bold green]")
+            console.print(f"  Results: {result_path}")
+        console.print(f"Completed {completed}/{total_trials} trials")
+        _print_completeness_summary(all_results, console)
+
+        summary_rows.append((label or result_path.name, result_path, completed, total_trials))
+
+    if use_sublists:
+        console.print("\n[bold green]Batch complete![/bold green]")
+        console.print(f"Batch folder: {per_run_parent}")
+        for label, path, done, total in summary_rows:
+            console.print(f"  {label}: {done}/{total} -> {path.name}")
+        console.print(
+            "\n[dim]To generate plots for one sublist: "
+            f"uv run python scripts/analyze_results.py plot "
+            f"{per_run_parent / summary_rows[0][0]}[/dim]"
+        )
+    else:
+        result_path = summary_rows[0][1]
+        console.print(
+            "\n[dim]To generate plots: "
+            f"uv run python scripts/analyze_results.py plot {result_path}[/dim]"
+        )
 
 
 @app.command()

@@ -31,6 +31,7 @@ class ExperimentRunner:
         persona_file_paths: Optional[list[Path]] = None,
         on_trial_complete: Optional[Callable[[TrialResult], None]] = None,
         model_display_names: Optional[dict] = None,
+        run_folder_name: Optional[str] = None,
     ):
         """Initialize the experiment runner.
 
@@ -45,6 +46,10 @@ class ExperimentRunner:
             model_display_names: Template variable definitions from config for
                 expanding {name}, {full_name}, {maker}, {version_history} in
                 persona system prompts.
+            run_folder_name: Optional explicit name for the run sub-folder created
+                under results_dir. If omitted, a UTC timestamp is used (original
+                behaviour). Callers running a batch of related experiments can
+                use this to give each child run a recognisable label.
         """
         self.config = config
         self.source_personas = source_personas
@@ -54,6 +59,7 @@ class ExperimentRunner:
         self.persona_file_paths = persona_file_paths or []
         self.on_trial_complete = on_trial_complete
         self.model_display_names = model_display_names or {}
+        self.run_folder_name = run_folder_name
 
         # Group models by provider for rate limiting
         self._providers: dict[str, LLMProvider] = {}
@@ -216,13 +222,16 @@ class ExperimentRunner:
             yield result
 
     def _create_run_folder(self) -> Path:
-        """Create timestamped run folder and copy config files.
+        """Create the run folder and copy config files.
+
+        Uses ``self.run_folder_name`` if set; otherwise falls back to a UTC
+        timestamp (the original behaviour).
 
         Returns:
             Path to the run folder.
         """
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        run_folder = self.results_dir / timestamp
+        folder_name = self.run_folder_name or datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        run_folder = self.results_dir / folder_name
         run_folder.mkdir(parents=True, exist_ok=True)
 
         # Copy config file if provided
@@ -337,6 +346,7 @@ async def run_experiment(
     persona_file_paths: Optional[list[Path]] = None,
     on_trial_complete: Optional[Callable[[TrialResult], None]] = None,
     model_display_names: Optional[dict] = None,
+    run_folder_name: Optional[str] = None,
 ) -> Path:
     """Run a complete experiment.
 
@@ -349,6 +359,8 @@ async def run_experiment(
         persona_file_paths: Paths to persona JSON files to copy to run folder.
         on_trial_complete: Optional callback for each completed trial.
         model_display_names: Template variable definitions from config.
+        run_folder_name: Optional explicit name for the run sub-folder. If
+            omitted, a UTC timestamp is used (original behaviour).
 
     Returns:
         Path to the run folder.
@@ -362,5 +374,6 @@ async def run_experiment(
         persona_file_paths=persona_file_paths,
         on_trial_complete=on_trial_complete,
         model_display_names=model_display_names,
+        run_folder_name=run_folder_name,
     )
     return await runner.run_and_save()
