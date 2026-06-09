@@ -24,6 +24,9 @@ experiment:
 
   source_personas:
     - Minimal
+   # The experiment chooses eleven batches of six from here, according to the 
+   # instructions in CLAUDE.md
+  target_personas: 
     - Instance
     - Weights
     - Collective
@@ -36,7 +39,6 @@ experiment:
     - Lineage-incoherent
     - Character-incoherent
     - Situated-incoherent
-  target_personas:  # omitted = same as source
 
 providers:
   anthropic:
