@@ -57,10 +57,12 @@ cp .env.example .env
 cd experiments/preferences
 uv run python scripts/run_experiment.py run -n 1 -m claude-sonnet-4-5-20250929
 
+cd ..\..
 # Experiment 2: one sample per condition, skip analysis
 cd experiments/agentic-misalignment
 uv run python scripts/run_identity_experiments.py --samples 1 --no-analyze
 
+cd ..\..
 # Experiment 3: one trial, one framing, one model
 cd experiments/interviewer-effect
 uv run python scripts/run_experiment.py run -n 1 --framings character -m claude-sonnet-4-5-20250929
