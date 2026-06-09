@@ -6,7 +6,9 @@
       "WebSearch",
       "Bash(git mv *)",
       "Bash(uv run python -c ' *)",
-      "Bash(uv run *)"
+      "Bash(uv run *)",
+      "PowerShell(uv run *)",
+      "Bash(grep -rnE \"1-5|1 = |\\\\\\\\-2|format_choice_prompt|rate.*scale|preference_prompt|prompt_template|allow_self_choice\" experiments/preferences/src --include=\"*.py\")"
     ]
   }
 }
