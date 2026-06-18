@@ -4,6 +4,7 @@ from .base import LLMProvider, ChoiceResponse
 from .anthropic import AnthropicProvider
 from .openai import OpenAIProvider
 from .openrouter import OpenRouterProvider
+from .XAI import xAIProvider
 
 __all__ = [
     "LLMProvider",
@@ -11,6 +12,7 @@ __all__ = [
     "AnthropicProvider",
     "OpenAIProvider",
     "OpenRouterProvider",
+    "xAIProvider"
 ]
 
 
@@ -32,6 +34,8 @@ def get_provider_for_model(model: str) -> LLMProvider:
         return OpenAIProvider()
     elif model in OpenRouterProvider.SUPPORTED_MODELS:
         return OpenRouterProvider()
+    elif model in xAIProvider.SUPPORTED_MODELS:
+        return xAIProvider
     else:
         raise ValueError(
             f"No provider found for model: {model}. "

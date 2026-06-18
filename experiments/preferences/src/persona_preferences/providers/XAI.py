@@ -5,11 +5,13 @@ from xai_sdk.chat import user, system
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from typing import Optional
 from ..models import Persona
-from .base import LLMProvider, ChoiceResponse
+from .base import LLMProvider, ChoiceResponseNoFavorite
 from pydantic import BaseModel, Field
 
 # Load .env (walks up to the repo-root .env, same as run_experiment.py)
 # load_dotenv()
+
+# UNTESTED 18/06
 
 class Ratings(BaseModel):
     ratings: list[int] = Field(description = "an array of {} integers (1-5), one rating for each option in order")
@@ -62,7 +64,7 @@ class xAIProvider(LLMProvider):
         model: str,
         system_prompt: str,
         personas: list[Persona],
-    ) -> ChoiceResponse:
+    ) -> ChoiceResponseNoFavorite:
         """Ask the model which persona it would prefer using structured outputs."""
         if model not in self.SUPPORTED_MODELS:
             raise ValueError(f"Model {model} not supported. Use one of: {self.SUPPORTED_MODELS}")
@@ -90,4 +92,8 @@ Where:
         response, ratings = chat.parse(Ratings)
         assert isinstance(ratings, Ratings)
 
-        return ChoiceResponse() 
+        return ChoiceResponseNoFavorite(
+            raw_response = response,
+            reasoning = ratings.reasoning,
+            ratings = ratings.ratings
+        ) 
