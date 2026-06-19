@@ -8,7 +8,10 @@
       "Bash(uv run python -c ' *)",
       "Bash(uv run *)",
       "PowerShell(uv run *)",
-      "Bash(grep -rnE \"1-5|1 = |\\\\\\\\-2|format_choice_prompt|rate.*scale|preference_prompt|prompt_template|allow_self_choice\" experiments/preferences/src --include=\"*.py\")"
+      "Bash(grep -rnE \"1-5|1 = |\\\\\\\\-2|format_choice_prompt|rate.*scale|preference_prompt|prompt_template|allow_self_choice\" experiments/preferences/src --include=\"*.py\")",
+      "Bash(../../.venv/Scripts/python.exe -c \"import xai_sdk; print\\('xai_sdk OK', getattr\\(xai_sdk,'__version__','?'\\)\\)\")",
+      "Bash(../../.venv/Scripts/python.exe -m pip list)",
+      "Bash(.venv/Scripts/python.exe -m pip list)"
     ]
   }
 }

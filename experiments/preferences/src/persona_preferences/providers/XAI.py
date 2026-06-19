@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 # load_dotenv()
 
 # UNTESTED 18/06
+# IN CONSIDERATION: switch back to ChoiceResponse after making favourite optional in that class.
 
 class Ratings(BaseModel):
     ratings: list[int] = Field(description = "an array of {} integers (1-5), one rating for each option in order")
