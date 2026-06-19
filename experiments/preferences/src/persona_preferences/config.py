@@ -69,6 +69,7 @@ def get_experiment_config(config: dict, override_models: Optional[list[str]] = N
         randomize_order=exp_config.get("randomize_order", True),
         max_concurrent=exp_config.get("max_concurrent", 5),
         allow_self_choice=exp_config.get("allow_self_choice", True),
+        ratings_only=exp_config.get("ratings_only", False),
     )
 
 
