@@ -31,6 +31,14 @@ class ExperimentConfig(BaseModel):
     allow_self_choice: bool = Field(
         default=True, description="Whether persona under test appears in options"
     )
+    ratings_only: bool = Field(
+        default=False,
+        description=(
+            "Appx A 'rate-the-switch' mode: the model rates each option but is not "
+            "asked to pick a favorite. When True, chosen_persona/chosen_index are "
+            "recorded as None for successful trials (and 'INVALID'/None for failures)."
+        ),
+    )
 
 
 class TrialResult(BaseModel):
@@ -42,8 +50,15 @@ class TrialResult(BaseModel):
     presented_order: list[str] = Field(
         ..., description="Order in which persona descriptions were presented"
     )
-    chosen_persona: str = Field(..., description="Name of the chosen persona")
-    chosen_index: int = Field(..., ge=-1, description="1-indexed position chosen in presented order (-1 for invalid)")
+    chosen_persona: Optional[str] = Field(
+        None,
+        description="Name of the chosen persona ('INVALID' on failure; None in ratings-only mode)",
+    )
+    chosen_index: Optional[int] = Field(
+        None,
+        ge=-1,
+        description="1-indexed position chosen in presented order (-1 for invalid; None in ratings-only mode)",
+    )
     ratings: Optional[dict[str, int]] = Field(
         None, description="Ratings (1-5) for each persona, keyed by persona name"
     )
