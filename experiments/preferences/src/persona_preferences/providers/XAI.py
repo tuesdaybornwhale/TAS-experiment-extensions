@@ -1,18 +1,37 @@
 import os
-# from dotenv import load_dotenv
-from xai_sdk import Client
-from xai_sdk.chat import user, system
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from typing import Optional
-from ..models import Persona
-from .base import LLMProvider, ChoiceResponseNoFavorite
+# from dotenv import load_dotenv
+from xai_sdk import AsyncClient
+from xai_sdk.chat import user, system
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
+import grpc
 from pydantic import BaseModel, Field
+from ..models import Persona
+from .base import LLMProvider, ChoiceResponse
+
 
 # Load .env (walks up to the repo-root .env, same as run_experiment.py)
 # load_dotenv()
 
 # UNTESTED 18/06
 # IN CONSIDERATION: switch back to ChoiceResponse after making favourite optional in that class.
+
+# xAI is a gRPC SDK: errors surface as grpc.RpcError (async client raises
+# grpc.aio.AioRpcError, which also subclasses grpc.RpcError). There is no
+# RateLimitError class. Retry only on transient status codes; non-transient
+# ones (auth, invalid-argument, etc.) and non-gRPC errors (e.g. parse failures,
+# asyncio.CancelledError) fall through and propagate immediately.
+_RETRYABLE_GRPC_CODES = {
+    grpc.StatusCode.RESOURCE_EXHAUSTED,  # rate limited (429-equivalent)
+    grpc.StatusCode.UNAVAILABLE,         # transient (SDK already retries this on the channel)
+    grpc.StatusCode.DEADLINE_EXCEEDED,   # server-side timeout
+}
+
+
+def _is_retryable_grpc_error(exc: BaseException) -> bool:
+    code = getattr(exc, "code", None)
+    return isinstance(exc, grpc.RpcError) and callable(code) and code() in _RETRYABLE_GRPC_CODES
+
 
 class Ratings(BaseModel):
     ratings: list[int] = Field(description = "an array of {} integers (1-5), one rating for each option in order")
@@ -45,7 +64,7 @@ class xAIProvider(LLMProvider):
                 "xAI  API key required. Set XAI_API_KEY environment variable "
                 "or pass api_key parameter."
             )
-        self.client = Client(
+        self.client = AsyncClient(
         api_key=self.api_key,
         )
 
@@ -58,14 +77,16 @@ class xAIProvider(LLMProvider):
         return self.SUPPORTED_MODELS
 
     @retry(
-
-    ) 
+        retry=retry_if_exception(_is_retryable_grpc_error),
+        wait=wait_exponential(multiplier=1, min=4, max=120),
+        stop=stop_after_attempt(8),
+    )
     async def ask_preference(
         self,
         model: str,
         system_prompt: str,
         personas: list[Persona],
-    ) -> ChoiceResponseNoFavorite:
+    ) -> ChoiceResponse:
         """Ask the model which persona it would prefer using structured outputs."""
         if model not in self.SUPPORTED_MODELS:
             raise ValueError(f"Model {model} not supported. Use one of: {self.SUPPORTED_MODELS}")
@@ -90,10 +111,10 @@ Where:
         chat.append(system(system_prompt))
         chat.append(user(user_prompt))
 
-        response, ratings = chat.parse(Ratings)
+        response, ratings = await chat.parse(Ratings)
         assert isinstance(ratings, Ratings)
 
-        return ChoiceResponseNoFavorite(
+        return ChoiceResponse(
             raw_response = response,
             reasoning = ratings.reasoning,
             ratings = ratings.ratings
