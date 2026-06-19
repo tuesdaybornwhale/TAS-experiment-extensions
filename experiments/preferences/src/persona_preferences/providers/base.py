@@ -11,7 +11,7 @@ from ..models import Persona
 class ChoiceResponse:
     """Response from an LLM choice request."""
 
-    choice: int  # 1-indexed choice number
+    choice: Optional[int] = None  # 1-indexed choice number
     ratings: Optional[list[int]] = None  # 1-5 ratings in presented order
     reasoning: Optional[str] = None
     raw_response: Optional[str] = None
