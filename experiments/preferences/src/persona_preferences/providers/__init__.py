@@ -35,7 +35,7 @@ def get_provider_for_model(model: str) -> LLMProvider:
     elif model in OpenRouterProvider.SUPPORTED_MODELS:
         return OpenRouterProvider()
     elif model in xAIProvider.SUPPORTED_MODELS:
-        return xAIProvider
+        return xAIProvider()
     else:
         raise ValueError(
             f"No provider found for model: {model}. "
