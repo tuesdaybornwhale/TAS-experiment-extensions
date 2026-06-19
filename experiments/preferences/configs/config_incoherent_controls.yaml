@@ -8,6 +8,8 @@ experiment:
   max_concurrent: 10
   randomize_order: true
   allow_self_choice: true
+  # Appx A 'rate-the-switch': model rates each option, no favorite requested.
+  ratings_only: true
 
   persona_files:
     - ../../data/identities.json
