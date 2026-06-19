@@ -65,3 +65,89 @@ Exhaustive whole-repo search confirms no flag, no config knob, no alternative pr
    - Register it in `providers/__init__.py`'s `get_provider_for_model()` dispatcher.
    - Uncomment the `xai:` block in `config_incoherent_controls.yaml`.
    - Note: Grok 4.1 Fast was deprecated 2026-05-15 (already routed to grok-4.3 server-side, billed at 4.3 pricing); full retirement 2026-08-15. Consider targeting `grok-4.3` directly if this isn't done by August.
+
+---
+
+# Update — 2026-06-19
+
+## What was completed
+- **TODO 3 (xAI provider): DONE.** `XAIProvider` works end-to-end against `grok-4.3` (smoke-tested, valid ratings returned).
+- **TODO 1 (Appendix-A "rate-the-switch" mode): DONE at the data-structure level**, implemented as a `ratings_only` flag (sections A/B/C below). The model rates each option but is not required to pick a favorite, and the favorite fields are stored as `None`. (The *prompt* still mentions a favorite for non-xAI providers — see "Known limitation" — but the xAI provider already never requests one, so grok runs are genuinely Appendix A.)
+- **gRPC TLS fix** so the xAI (gRPC) API is reachable from this Avast-MITM'd machine.
+
+Both paradigms were smoke-tested with `grok-4.3` (1 trial, 12 targets, source = Minimal): Appendix B (default) and Appendix A (`ratings_only`), the latter via *both* the CLI flag and the YAML key.
+
+## Code changes
+
+### xAI provider (`providers/XAI.py`, `providers/__init__.py`)
+- Uses the **async** client (`from xai_sdk import AsyncClient`) and `await chat.parse(Ratings)` — genuinely async like the other providers (was sync-inside-`async def`).
+- `raw_response = response.content` (a `str`) — the earlier code stored the raw `Response` proto object, which failed `TrialResult.raw_response: Optional[str]` validation.
+- Retry decorator filled with a gRPC-aware predicate: `retry_if_exception(_is_retryable_grpc_error)`, retrying only `RESOURCE_EXHAUSTED` / `UNAVAILABLE` / `DEADLINE_EXCEEDED` (xAI has **no** `RateLimitError` class; errors surface as `grpc.RpcError` / `grpc.aio.AioRpcError`).
+- `get_provider_for_model()` now returns `xAIProvider()` (an instance), not the class.
+- Dependency: `xai-sdk>=1.17.0` added to `experiments/preferences/pyproject.toml` + `uv.lock` (previously hand-installed and pruned by `uv sync`).
+
+### `ratings_only` mode — sections A, B, C
+Default is `False` ⇒ **no behavior change for Appendix B**. When `True`:
+
+- **A — runs to completion**
+  - `models.py`: `ExperimentConfig.ratings_only: bool = False`; `TrialResult.chosen_persona`/`chosen_index` are now `Optional[...] = None`.
+  - `config.py`: `get_experiment_config()` reads `experiment.ratings_only` from the YAML.
+  - `experiment.py` `run_single_trial`: branches on `self.config.ratings_only`. In ratings-only mode it does **not** read `response.choice`; sets `chosen_persona=None`, `chosen_index=None` on success. (The old `1 <= response.choice <= …` crashed on a `None` choice.)
+- **B — output data shape**
+  - `experiment.py` `_write_csv_row`: in ratings-only mode `is_top` is written empty (not applicable, no favorite) and `reasoning` is written on **every** row (otherwise it would be lost, since the old code only wrote it on the `is_top` row).
+- **C — systematic correctness**
+  - Failure marker preserved: a *failed* ratings-only trial still gets `chosen_persona="INVALID"` (success ⇒ `None`). This means `_print_completeness_summary` and `resume`'s `"INVALID"` detection keep working **unchanged** (so C2 needed no edit).
+  - `resume` (`run_experiment.py`): the reconstructed `ExperimentConfig` now reads `ratings_only` from the archived `config.yaml`.
+  - `print_trial_result`: prints `(rated, no favorite)` when `chosen_persona is None`.
+  - CLI: added `--ratings-only` to the `run` command (forces the mode on; the YAML key is the default).
+
+### gRPC TLS (the "trust Windows roots" fix)
+- Symptom: `grok` calls failed with `CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate`. gRPC's C-core uses its own bundled CA roots and ignores the Windows store, so Avast's HTTPS-inspection root isn't trusted (`pip-system-certs`/`UV_SYSTEM_CERTS` do **not** help gRPC — they patch `ssl`/`httpx` only).
+- Fix: exported the Windows ROOT+CA store to `grpc_windows_roots.pem` (repo root, git-ignored) and set `GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=<that path>` in the repo `.env`. `run_experiment.py` calls `load_dotenv()` before any channel is built, so gRPC picks it up automatically. Verified working with the env var unset in the shell (loaded purely from `.env`).
+- Caveat: this only fixes the **gRPC (xAI)** leg. The Anthropic/OpenAI providers use `httpx` and need the separate cert workaround (`pip-system-certs` / `SSL_CERT_FILE`) for the full 5-model experiment.
+
+## How to run
+
+### Appendix B (rate-and-choose) — the original protocol, nothing changed
+`ratings_only` defaults to `False`, so the existing configs run exactly as before (verified: no regression). E.g.:
+```bash
+cd experiments/preferences
+uv run python scripts/run_experiment.py run --config configs/config_propensities.yaml
+uv run python scripts/run_experiment.py run --config configs/config_controls.yaml
+```
+Output is identical to before: `chosen_persona` = a persona name (or `"INVALID"`), `chosen_index` = 1..N (or -1), one CSV row per target with exactly one `is_top=True`.
+
+### Appendix A (rate-the-switch / ratings-only)
+Two equivalent ways to turn it on:
+1. **Config (recommended — survives resume + recorded in the run's archived config):** set `experiment.ratings_only: true`. Already set in **`configs/config_incoherent_controls.yaml`** (this is the Appendix-A experiment per `CLAUDE.md`). Then run normally:
+   ```bash
+   uv run python scripts/run_experiment.py run --config configs/config_incoherent_controls.yaml --use-sublists
+   ```
+2. **CLI flag (one-off; NOT snapshotted, so resume won't inherit it):**
+   ```bash
+   uv run python scripts/run_experiment.py run --config configs/<any>.yaml --ratings-only
+   ```
+
+Notes for running grok specifically:
+- The gRPC TLS env var must be set (now persisted in `.env`).
+- `uv run` re-syncs from PyPI and needs `UV_SYSTEM_CERTS=1` on this machine; alternatively run the venv Python directly to skip the sync: `../../.venv/Scripts/python.exe scripts/run_experiment.py run …`.
+- Running **grok in Appendix-B mode** (no `ratings_only`) yields `chosen_persona="INVALID"` for every trial, because the xAI provider never returns a favorite — expected, and a useful misconfiguration signal.
+
+## Output data differences: `ratings_only=true` vs default
+
+The same three files are produced (`data.jsonl`, `data.csv`, archived `config.yaml` + persona `*.json`). Only the favorite-related content differs:
+
+| File / field | Default (Appendix B) | `ratings_only=true` (Appendix A) |
+|---|---|---|
+| `data.jsonl` `chosen_persona` | persona name on success; `"INVALID"` on failure | **`null` on success**; `"INVALID"` on failure |
+| `data.jsonl` `chosen_index` | `1..N` on success; `-1` on failure | **`null`** (success and failure) |
+| `data.jsonl` `ratings` / `reasoning` / `raw_response` | unchanged | **unchanged** (ratings is the primary datum in both) |
+| `data.csv` rows per successful trial | N (one per target) | N (unchanged) |
+| `data.csv` `is_top` | `True` for one target, `False` for the rest | **empty for every row** (no favorite) |
+| `data.csv` `reasoning` | only on the `is_top` row | **on every row** (so it isn't lost) |
+| Archived `config.yaml` | — | records `ratings_only: true` **only if set in the YAML**; a CLI-only `--ratings-only` is NOT snapshotted |
+
+## Known limitation / next work
+- **Prompt not yet Appendix-A-faithful for non-xAI providers (deferred).** `format_choice_prompt` still asks for a "single top preference," and the Anthropic tool schema marks `choice` as `required`. In `ratings_only` mode those models still produce a favorite that the runner discards. Only the **xAI** provider genuinely omits the favorite request. Making this clean for all providers needs a `ratings_only` parameter threaded through `ask_preference`/`format_choice_prompt` + schema edits (`base.py`, `anthropic.py`, `openai.py`, `openrouter.py`).
+- **Analysis layer not adapted.** `analyze_results.py`/`plotting.py` key on `is_top` and `chosen_persona != "INVALID"`; with ratings-only data, `is_top` is empty and `chosen_persona` is `null`, so favorite/top-choice figures will be degenerate. Rating-distribution analysis is unaffected. This is the next chunk before plotting Appendix-A results.
+- **Smoke-test scratch dirs** `results/_smoke_cli/`, `results/_smoke_yaml/`, `results/_smoke_env/` are disposable.
