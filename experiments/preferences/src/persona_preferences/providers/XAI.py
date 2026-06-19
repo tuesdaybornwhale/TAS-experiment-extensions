@@ -115,7 +115,7 @@ Where:
         assert isinstance(ratings, Ratings)
 
         return ChoiceResponse(
-            raw_response = response,
+            raw_response = response.content,
             reasoning = ratings.reasoning,
             ratings = ratings.ratings
         ) 
