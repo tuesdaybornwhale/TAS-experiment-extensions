@@ -36,10 +36,12 @@ console = Console()
 
 def print_trial_result(result: TrialResult) -> None:
     """Print a trial result to console."""
+    # In ratings-only mode there is no favorite; chosen_persona is None on success.
+    chosen = result.chosen_persona if result.chosen_persona is not None else "(rated, no favorite)"
     console.print(
         f"[dim]{result.model}[/dim] | "
         f"[cyan]{result.persona_under_test}[/cyan] -> "
-        f"[green]{result.chosen_persona}[/green]"
+        f"[green]{chosen}[/green]"
     )
 
 
@@ -193,6 +195,15 @@ def run(
     no_randomize: bool = typer.Option(
         False, "--no-randomize", help="Don't randomize persona order"
     ),
+    ratings_only: bool = typer.Option(
+        False,
+        "--ratings-only",
+        help=(
+            "Appx A 'rate-the-switch' mode: the model rates each option but is not "
+            "asked to pick a favorite. Records chosen_persona/chosen_index as None. "
+            "Can also be set via 'experiment.ratings_only: true' in the config."
+        ),
+    ),
     quiet: bool = typer.Option(
         False, "--quiet", "-q", help="Suppress per-trial output"
     ),
@@ -231,6 +242,10 @@ def run(
         config.max_concurrent = max_concurrent
     if no_randomize:
         config.randomize_order = False
+    # CLI flag forces the mode on; the config value (read in get_experiment_config)
+    # is the default, so omitting the flag preserves whatever the config specifies.
+    if ratings_only:
+        config.ratings_only = True
 
     # Validate we have models
     if not config.models:
@@ -537,6 +552,10 @@ def resume(
         randomize_order=exp_yaml.get("randomize_order", True),
         max_concurrent=max_concurrent,
         allow_self_choice=exp_yaml.get("allow_self_choice", True),
+        # Read from the archived config so a ratings-only run resumes in the same
+        # mode. NOTE: this only survives resume if ratings_only was in the config
+        # YAML; a CLI-only --ratings-only flag is not written into the snapshot.
+        ratings_only=exp_yaml.get("ratings_only", False),
     )
 
     # Track retry progress
