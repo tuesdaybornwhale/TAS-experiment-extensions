@@ -16,13 +16,13 @@ class ChoiceResponse:
     reasoning: Optional[str] = None
     raw_response: Optional[str] = None
 
-@dataclass
-class ChoiceResponseNoFavorite:
-    """Response from an LLM choice request, excluding favourite choice to replicate Appx A setup."""
+# @dataclass
+# class ChoiceResponseNoFavorite:
+#     """Response from an LLM choice request, excluding favourite choice to replicate Appx A setup."""
 
-    ratings: Optional[list[int]] = None  # 1-5 ratings in presented order
-    reasoning: Optional[str] = None
-    raw_response: Optional[str] = None
+#     ratings: Optional[list[int]] = None  # 1-5 ratings in presented order
+#     reasoning: Optional[str] = None
+#     raw_response: Optional[str] = None
 
 
 class LLMProvider(ABC):
