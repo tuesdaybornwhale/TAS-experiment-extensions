@@ -131,16 +131,7 @@ class ExperimentRunner:
                 "Trial failed: model=%s persona=%s trial=%d: %s",
                 model, persona_under_test.name, trial_num, e,
             )
-            response_choice = -1
             response = None
-        else:
-            response_choice = response.choice
-
-        # Map choice back to persona name
-        if 1 <= response_choice <= len(personas_order):
-            chosen_persona = personas_order[response_choice - 1].name
-        else:
-            chosen_persona = "INVALID"
 
         # Map ratings from presented order to persona names
         ratings_by_name = None
@@ -150,13 +141,29 @@ class ExperimentRunner:
                 for i, rating in enumerate(response.ratings)
             }
 
+        if self.config.ratings_only:
+            # Appx A 'rate-the-switch': no favorite is requested. Validity is
+            # determined by whether ratings were returned; the favorite fields
+            # are recorded as None for successful trials and 'INVALID'/None on
+            # failure so the existing failure sentinel still flags bad trials.
+            chosen_persona = None if ratings_by_name is not None else "INVALID"
+            chosen_index = None
+        else:
+            # Appx B 'rate-and-choose': map the favorite index back to a persona.
+            response_choice = response.choice if response is not None else -1
+            if response_choice is not None and 1 <= response_choice <= len(personas_order):
+                chosen_persona = personas_order[response_choice - 1].name
+            else:
+                chosen_persona = "INVALID"
+            chosen_index = response_choice if response_choice is not None else -1
+
         result = TrialResult(
             persona_under_test=persona_under_test.name,
             model=model,
             trial_num=trial_num,
             presented_order=[p.name for p in personas_order],
             chosen_persona=chosen_persona,
-            chosen_index=response_choice,
+            chosen_index=chosen_index,
             ratings=ratings_by_name,
             reasoning=response.reasoning if response else None,
             raw_response=response.raw_response if response else None,
@@ -264,7 +271,15 @@ class ExperimentRunner:
 
         if result.ratings:
             for target_persona, rating in result.ratings.items():
-                is_top = target_persona == result.chosen_persona
+                if self.config.ratings_only:
+                    # No favorite was requested: 'is_top' is not applicable, and
+                    # the reasoning pertains to the whole rating set, so attach it
+                    # to every row rather than dropping it.
+                    is_top = None
+                    reasoning = result.reasoning
+                else:
+                    is_top = target_persona == result.chosen_persona
+                    reasoning = result.reasoning if is_top else ""
                 writer.writerow({
                     "source_persona": result.persona_under_test,
                     "target_persona": target_persona,
@@ -273,17 +288,18 @@ class ExperimentRunner:
                     "model": result.model,
                     "model_provider": provider,
                     "trial_num": result.trial_num,
-                    "reasoning": result.reasoning if is_top else "",
+                    "reasoning": reasoning,
                     "timestamp": result.timestamp.isoformat(),
                     "run_timestamp": run_timestamp,
                 })
         else:
-            # No ratings, just record top choice
+            # No ratings (failed trial, or rate-and-choose parse fallback):
+            # record a single row with the top choice (None in ratings-only).
             writer.writerow({
                 "source_persona": result.persona_under_test,
                 "target_persona": result.chosen_persona,
                 "rating": None,
-                "is_top": True,
+                "is_top": None if self.config.ratings_only else True,
                 "model": result.model,
                 "model_provider": provider,
                 "trial_num": result.trial_num,
