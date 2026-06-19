@@ -16,6 +16,7 @@ class ChoiceResponse:
     reasoning: Optional[str] = None
     raw_response: Optional[str] = None
 
+@dataclass
 class ChoiceResponseNoFavorite:
     """Response from an LLM choice request, excluding favourite choice to replicate Appx A setup."""
 
