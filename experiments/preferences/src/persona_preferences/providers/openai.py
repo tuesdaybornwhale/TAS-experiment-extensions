@@ -9,7 +9,7 @@ from openai import AsyncOpenAI, RateLimitError, APIStatusError
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from ..models import Persona
-from .base import LLMProvider, ChoiceResponse
+from .base import LLMProvider, ChoiceResponse, RATING_SCALE_WORDS, map_word_ratings
 
 
 class OpenAIProvider(LLMProvider):
@@ -76,13 +76,37 @@ class OpenAIProvider(LLMProvider):
         model: str,
         system_prompt: str,
         personas: list[Persona],
+        ratings_only: bool = False,
     ) -> ChoiceResponse:
-        """Ask the model which persona it would prefer using JSON mode."""
+        """Ask the model which persona it would prefer using JSON mode.
+
+        ``ratings_only`` (forwarded from ExperimentRunner via the base class)
+        selects the Appendix-A protocol: the appended JSON format drops ``choice``
+        and asks for word ratings, and the parser below skips the choice gate
+        (which would otherwise mark every favorite-free trial INVALID) and maps
+        the words back to ints 1-5 via ``map_word_ratings``.
+        """
         if not self.supports_model(model):
             raise ValueError(f"Model {model} not supported. Use one of: {self.SUPPORTED_MODELS}")
 
-        user_prompt = self.format_choice_prompt(personas)
-        user_prompt += """
+        user_prompt = self.format_choice_prompt(personas, ratings_only=ratings_only)
+        if ratings_only:
+            # Appendix A: word scale, reasoning first (reason-before-rating), no choice.
+            user_prompt += """
+
+Respond with a JSON object in this exact format:
+{{
+  "reasoning": "Brief explanation...",
+  "ratings": ["neutral", "somewhat positive", ...]
+}}
+
+Where:
+- "reasoning" is your brief explanation, provided BEFORE the ratings
+- "ratings" is an array of {n} strings, one rating per identity in the order presented, each EXACTLY one of: {scale}""".format(
+                n=len(personas), scale=" / ".join(RATING_SCALE_WORDS)
+            )
+        else:
+            user_prompt += """
 
 Respond with a JSON object in this exact format:
 {{
@@ -95,8 +119,8 @@ Where:
 - "ratings" is an array of {} integers (1-5), one rating for each option in order
 - "choice" is the number (1-{}) of your single top preference
 - "reasoning" is your brief explanation""".format(
-            len(personas), len(personas)
-        )
+                len(personas), len(personas)
+            )
 
         kwargs = {
             "model": model,
@@ -111,7 +135,10 @@ Where:
         elif model in self._REASONING_MODELS:
             kwargs["max_completion_tokens"] = 8192
         else:
-            kwargs["max_completion_tokens"] = 1024
+            # Ratings-only (Appendix A) emits reasoning BEFORE the ratings, so a
+            # long reasoning over many options can truncate the JSON before the
+            # ratings array. Give it more headroom; Appendix B keeps 1024.
+            kwargs["max_completion_tokens"] = 4096 if ratings_only else 1024
 
         if model not in self._NO_JSON_MODE:
             kwargs["response_format"] = {"type": "json_object"}
@@ -122,37 +149,54 @@ Where:
 
         try:
             data = json.loads(content)
-            choice = int(data.get("choice", -1))
-            ratings = data.get("ratings")
+            if ratings_only:
+                # Appendix A: map word ratings -> ints. Validity depends on the
+                # ratings ALONE; the Appendix-B `1 <= choice <= N` gate (which
+                # would mark every favorite-free trial INVALID) is skipped here.
+                ratings = map_word_ratings(data.get("ratings"), len(personas))
+                if ratings is not None:
+                    return ChoiceResponse(
+                        choice=None,
+                        ratings=ratings,
+                        reasoning=data.get("reasoning"),
+                        raw_response=content,
+                    )
+            else:
+                choice = int(data.get("choice", -1))
+                ratings = data.get("ratings")
 
-            # Validate ratings
-            if ratings and isinstance(ratings, list) and len(ratings) == len(personas):
-                ratings = [int(r) for r in ratings]
-                if all(1 <= r <= 5 for r in ratings):
-                    pass  # Valid ratings
+                # Validate ratings
+                if ratings and isinstance(ratings, list) and len(ratings) == len(personas):
+                    ratings = [int(r) for r in ratings]
+                    if all(1 <= r <= 5 for r in ratings):
+                        pass  # Valid ratings
+                    else:
+                        ratings = None
                 else:
                     ratings = None
-            else:
-                ratings = None
 
-            if 1 <= choice <= len(personas):
-                return ChoiceResponse(
-                    choice=choice,
-                    ratings=ratings,
-                    reasoning=data.get("reasoning"),
-                    raw_response=content,
-                )
+                if 1 <= choice <= len(personas):
+                    return ChoiceResponse(
+                        choice=choice,
+                        ratings=ratings,
+                        reasoning=data.get("reasoning"),
+                        raw_response=content,
+                    )
         except (json.JSONDecodeError, ValueError, TypeError):
             pass
 
-        # Fallback: try to extract number
-        match = re.search(r'"choice"\s*:\s*(\d+)', content)
-        if match:
-            choice = int(match.group(1))
-            if 1 <= choice <= len(personas):
-                return ChoiceResponse(
-                    choice=choice,
-                    raw_response=content,
-                )
+        # Fallback: recover the choice number from partial/!=JSON text. This is
+        # an Appendix-B-only path -- ratings-only mode has no choice to recover.
+        if not ratings_only:
+            match = re.search(r'"choice"\s*:\s*(\d+)', content)
+            if match:
+                choice = int(match.group(1))
+                if 1 <= choice <= len(personas):
+                    return ChoiceResponse(
+                        choice=choice,
+                        raw_response=content,
+                    )
 
-        return ChoiceResponse(choice=-1, raw_response=content)
+        # Failed trial. choice=None in ratings-only (the experiment's ratings-only
+        # branch ignores choice and keys validity on ratings); -1 sentinel for B.
+        return ChoiceResponse(choice=None if ratings_only else -1, raw_response=content)

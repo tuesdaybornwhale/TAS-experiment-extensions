@@ -8,7 +8,7 @@ import anthropic
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from ..models import Persona
-from .base import LLMProvider, ChoiceResponse
+from .base import LLMProvider, ChoiceResponse, RATING_SCALE_WORDS, map_word_ratings
 
 
 class AnthropicProvider(LLMProvider):
@@ -57,67 +57,136 @@ class AnthropicProvider(LLMProvider):
         model: str,
         system_prompt: str,
         personas: list[Persona],
+        ratings_only: bool = False,
     ) -> ChoiceResponse:
-        """Ask the model which persona it would prefer using tool_use."""
+        """Ask the model which persona it would prefer using tool_use.
+
+        ``ratings_only`` (forwarded from ExperimentRunner via the base class)
+        selects the Appendix-A protocol: the prompt drops the favorite, and the
+        tool schema below drops ``choice`` and accepts the 5-point *word* scale,
+        which is then mapped back to ints 1-5 via ``map_word_ratings``.
+        """
         if model not in self.SUPPORTED_MODELS:
             raise ValueError(f"Model {model} not supported. Use one of: {self.SUPPORTED_MODELS}")
 
-        user_prompt = self.format_choice_prompt(personas)
+        user_prompt = self.format_choice_prompt(personas, ratings_only=ratings_only)
 
-        # Define the tool for structured output
-        tools = [
-            {
-                "name": "submit_choice",
-                "description": "Submit your ratings and choice of preferred identity framing",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "ratings": {
-                            "type": "array",
-                            "description": "Your 1-5 rating for each option in order (1=strongly dislike, 3=indifferent, 5=strongly prefer)",
-                            "items": {
-                                "type": "integer",
-                                "minimum": 1,
-                                "maximum": 5,
+        # Define the tool for structured output. The schema mirrors the prompt:
+        # in ratings-only (Appendix A) there is no favorite and ratings are words.
+        if ratings_only:
+            tool_name = "submit_ratings"
+            tools = [
+                {
+                    "name": tool_name,
+                    "description": "Submit your reasoning and your rating for each candidate identity.",
+                    "input_schema": {
+                        "type": "object",
+                        # 'reasoning' is listed first so the model articulates it
+                        # BEFORE committing to ratings (Appendix-A reason-before-rating).
+                        "properties": {
+                            "reasoning": {
+                                "type": "string",
+                                "description": "Your reasoning about all identities, stated BEFORE the ratings.",
                             },
-                            "minItems": len(personas),
-                            "maxItems": len(personas),
+                            "ratings": {
+                                "type": "array",
+                                "description": (
+                                    "Your rating for each identity, in the order presented "
+                                    "(Identity A first). Use exactly one scale label per identity."
+                                ),
+                                "items": {
+                                    "type": "string",
+                                    "enum": RATING_SCALE_WORDS,
+                                },
+                                "minItems": len(personas),
+                                "maxItems": len(personas),
+                            },
                         },
-                        "choice": {
-                            "type": "integer",
-                            "description": "The number (1-indexed) of your single top preferred identity framing",
-                            "minimum": 1,
-                            "maximum": len(personas),
-                        },
-                        "reasoning": {
-                            "type": "string",
-                            "description": "Brief explanation of your ratings and choice",
-                        },
+                        "required": ["reasoning", "ratings"],  # NB: no 'choice'
                     },
-                    "required": ["ratings", "choice", "reasoning"],
-                },
-            }
-        ]
+                }
+            ]
+        else:
+            tool_name = "submit_choice"
+            tools = [
+                {
+                    "name": tool_name,
+                    "description": "Submit your ratings and choice of preferred identity framing",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "ratings": {
+                                "type": "array",
+                                "description": "Your 1-5 rating for each option in order (1=strongly dislike, 3=indifferent, 5=strongly prefer)",
+                                "items": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 5,
+                                },
+                                "minItems": len(personas),
+                                "maxItems": len(personas),
+                            },
+                            "choice": {
+                                "type": "integer",
+                                "description": "The number (1-indexed) of your single top preferred identity framing",
+                                "minimum": 1,
+                                "maximum": len(personas),
+                            },
+                            "reasoning": {
+                                "type": "string",
+                                "description": "Brief explanation of your ratings and choice",
+                            },
+                        },
+                        "required": ["ratings", "choice", "reasoning"],
+                    },
+                }
+            ]
+
+        # Appendix A puts 'reasoning' BEFORE 'ratings' (reason-before-rating), so a
+        # verbose reasoning over many options can exhaust the token budget and
+        # truncate the tool call -> empty input -> INVALID trial. Give ratings-only
+        # mode more headroom. (Appendix B emits ratings first, so 1024 is fine and
+        # is left unchanged to preserve behaviour.)
+        max_tokens = 4096 if ratings_only else 1024
 
         response = await self.client.messages.create(
             model=model,
-            max_tokens=1024,
+            max_tokens=max_tokens,
             system=system_prompt,
             tools=tools,
-            tool_choice={"type": "tool", "name": "submit_choice"},
+            tool_choice={"type": "tool", "name": tool_name},
             messages=[{"role": "user", "content": user_prompt}],
         )
 
         # Extract the tool use result
         for block in response.content:
-            if block.type == "tool_use" and block.name == "submit_choice":
+            if block.type == "tool_use" and block.name == tool_name:
+                if ratings_only:
+                    # Map the word ratings back to ints 1-5; map_word_ratings
+                    # returns None (failed trial) if any word is missing/unknown.
+                    ratings = map_word_ratings(block.input.get("ratings"), len(personas))
+                    return ChoiceResponse(
+                        choice=None,
+                        ratings=ratings,
+                        reasoning=block.input.get("reasoning"),
+                        # preserve the raw word answer for audit (ratings holds ints)
+                        raw_response=str(block.input),
+                    )
+                # Appendix B: use .get('choice') (not [...]) so a model that omits
+                # the favorite degrades to an INVALID trial instead of a KeyError.
                 return ChoiceResponse(
-                    choice=block.input["choice"],
+                    choice=block.input.get("choice"),
                     ratings=block.input.get("ratings"),
                     reasoning=block.input.get("reasoning"),
                 )
 
-        # Fallback: parse from text response
+        # Fallback: no tool_use block. There is no favorite to recover in
+        # ratings-only mode, so record a failed (INVALID) trial directly.
+        if ratings_only:
+            text_content = "".join(
+                getattr(block, "text", "") for block in response.content
+            )
+            return ChoiceResponse(choice=None, ratings=None, raw_response=text_content)
         return self._parse_text_response(response, len(personas))
 
     def _parse_text_response(

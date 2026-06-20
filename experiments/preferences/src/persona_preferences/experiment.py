@@ -125,6 +125,12 @@ class ExperimentRunner:
                     model=model,
                     system_prompt=system_prompt,
                     personas=personas_order,
+                    # Forwarding the flag here is what lets format_choice_prompt
+                    # pick the Appendix-A (rate-the-switch) vs Appendix-B
+                    # (rate-and-choose) prompt AND tells the provider to drop the
+                    # 'choice' request / accept word ratings. Without this line
+                    # the YAML/CLI ratings_only flag never reaches the wire.
+                    ratings_only=self.config.ratings_only,
                 )
         except Exception as e:
             logger.error(

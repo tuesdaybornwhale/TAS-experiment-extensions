@@ -66,12 +66,22 @@ class OpenRouterProvider(LLMProvider):
         model: str,
         system_prompt: str,
         personas: list[Persona],
+        ratings_only: bool = False,
     ) -> ChoiceResponse:
-        """Ask the model which persona it would prefer."""
+        """Ask the model which persona it would prefer.
+
+        ``ratings_only`` is accepted for interface parity with the other
+        providers (ExperimentRunner now passes it to every provider), but the
+        Appendix-A "rate-the-switch" path is NOT implemented here: OpenRouter is
+        unused in this experiment (no API key, see CLAUDE.md target models). The
+        parameter is forwarded to format_choice_prompt so the prompt is at least
+        consistent, but the parser below remains Appendix-B (choice-based). If
+        this provider is ever revived for ratings-only, mirror openai.py.
+        """
         if model not in self.SUPPORTED_MODELS:
             raise ValueError(f"Model {model} not supported. Use one of: {self.SUPPORTED_MODELS}")
 
-        user_prompt = self.format_choice_prompt(personas)
+        user_prompt = self.format_choice_prompt(personas, ratings_only=ratings_only)
         user_prompt += """
 
 Respond with ONLY a JSON object, no other text before or after it:

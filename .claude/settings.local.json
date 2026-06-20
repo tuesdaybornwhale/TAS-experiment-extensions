@@ -18,7 +18,9 @@
       "Bash(.venv/Scripts/python.exe -c 'import xai_sdk, os; print\\(os.path.dirname\\(xai_sdk.__file__\\)\\)')",
       "Bash(.venv/Scripts/python.exe -c 'import importlib.util as u; print\\('\\\\''exceptions module:'\\\\'', u.find_spec\\('\\\\''xai_sdk.exceptions'\\\\''\\)\\)')",
       "Bash(.venv/Scripts/python.exe -c 'from xai_sdk.exceptions import RateLimitError; print\\('\\\\''OK'\\\\''\\)')",
-      "Bash(.venv/Scripts/python.exe *)"
+      "Bash(.venv/Scripts/python.exe *)",
+      "WebFetch(domain:theartificialself.ai)",
+      "PowerShell($r = Invoke-WebRequest -Uri \"https://theartificialself.ai/experiment-controls\" -UseBasicParsing; $r.Content.Length)"
     ]
   }
 }
