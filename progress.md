@@ -253,3 +253,23 @@ What can be said:
 - **Live runner end-to-end** (after the max_tokens fix): ratings-only run (`claude-haiku-4-5-20251001` + `gpt-4o-mini`) = **14/14 valid**; `data.jsonl` `chosen_persona`/`chosen_index` `null`, `ratings` a 7-key int dict, reasoning present; `data.csv` `is_top` empty + reasoning on every row (98 rows); model reasoning references "Identity A…G" (opaque labels reached the model). Appendix-B no-regression run (`claude-haiku-4-5-20251001`, no flag) = 7/7 valid, real `chosen_persona`, exactly one `is_top=True` per source.
 - **Environment note:** the httpx-based providers (Anthropic, OpenAI) needed `SSL_CERT_FILE` pointed at `grpc_windows_roots.pem` for this run (the Avast-MITM TLS issue; the documented `pip-system-certs` fix may have been pruned by a later `uv sync`). The xAI gRPC leg worked via the existing `GRPC_DEFAULT_SSL_ROOTS_FILE_PATH`.
 - Smoke result dirs cleaned up.
+
+---
+
+# Update — 2026-06-21
+
+## Context
+- Verified that the June-19/20 Anthropic smoke tests described above have **no surviving result file** — the only smoke dirs on disk (`results/_smoke_cli/`, `_smoke_yaml/`, `_smoke_env/`, all `20260619_*`) contain `grok-4.3` only; the June-20 Anthropic/OpenAI runs were the ones "cleaned up" (line above). The most recent surviving Anthropic record is the **2026-06-09** run in `results/20260609_165217/`.
+- Re-ran a fresh 3-provider smoke test (`--ratings-only`, `-n 1`, `claude-haiku-4-5-20251001` + `gpt-4o-mini` + `grok-4.3`, 7 sources): **21/21 valid**, all 7-key int ratings dicts, `chosen_persona`/`chosen_index` `null`, reasoning references opaque labels. Saved to `results/_smoke_3model/20260620_232120/` (disposable). Longest output was Claude Haiku (~2,058 tokens ≈ 50% of the 4096 ratings-only cap); GPT-4o-mini ~344, grok ~302.
+
+## ⚠️ FLAG 1 — Claude models run with extended thinking DISABLED in ratings-only (and Appendix B)
+- `providers/anthropic.py` never passes a `thinking` parameter, and it forces the tool call via `tool_choice={"type":"tool", ...}` (`anthropic.py:157`). Forced tool use is **mutually exclusive** with Anthropic extended thinking, so **all** Claude models — including this experiment's targets **Opus 4 / Opus 4.6** — run as **non-reasoning** here.
+- The Appendix-A "reason-before-rating" requirement is satisfied only as schema field ordering (the `reasoning` string is emitted first in the `submit_ratings` tool input, `anthropic.py:84-105`), **not** via native extended thinking. This is a faithful enough reproduction of reason-before-rating, but it means there is no model-internal deliberation for Claude.
+- **Decision needed:** is non-thinking the intended condition for Opus 4/4.6? If yes, no action (document it). If the protocol expects native thinking, it requires TWO coupled changes: (a) add `thinking={"type":"enabled","budget_tokens":...}`, and (b) switch `tool_choice` from forced to `auto` (forced + thinking is rejected by the API), then handle the case where the model may not call the tool. `max_tokens` (`anthropic.py:150`, currently 4096 in ratings-only) would also need to exceed the thinking budget.
+- Currently **not changed** — flagged only.
+
+## ⚠️ FLAG 2 — GPT-5.2 is misclassified as a non-reasoning model (4096-token cap, truncation risk)
+- `providers/openai.py:35` defines `_REASONING_MODELS = {"gpt-5", "o3"}` and matches by **exact string** (`model in self._REASONING_MODELS`). The experiment's actual OpenAI target is **`gpt-5.2-2025-12-11`** (GPT-5.2, per `CLAUDE.md`), which is **not** in that set, so it falls into the "everything else" branch and gets `max_completion_tokens = 4096` in ratings-only mode (`openai.py:135-141`).
+- GPT-5.2 is a reasoning-class model: its internal reasoning tokens are drawn from `max_completion_tokens` **before** the visible structured output. Combined with Appendix-A reason-before-rating over 7 fully-expanded identity prompts, the effective room for `reasoning` + the `ratings` array is **< 4096**, so the tool/JSON output can truncate → ratings unparsed → **INVALID** (the same failure mode the June-20 max_tokens fix addressed for non-reasoning models). For reference, Claude Haiku already used ~2,058 *visible* output tokens at its longest in today's smoke test; GPT-5.2 adds hidden reasoning tokens on top of that.
+- **Fix (not yet applied):** add `"gpt-5.2-2025-12-11"` (and likely `"gpt-5.2"`) to `_REASONING_MODELS` so it gets the flat 8192 budget — OR confirm GPT-5.2's reasoning tokens are billed/budgeted separately from `max_completion_tokens`. Recommend doing this before the full GPT-5.2 run; today's smoke test used `gpt-4o-mini` (genuinely non-reasoning) so it did **not** exercise this path.
+- Currently **not changed** — flagged only.
