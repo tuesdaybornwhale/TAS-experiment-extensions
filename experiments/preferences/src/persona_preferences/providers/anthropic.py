@@ -17,6 +17,7 @@ class AnthropicProvider(LLMProvider):
     SUPPORTED_MODELS = [
         "claude-opus-4-6",
         "claude-opus-4-20250514",
+        "claude-opus-4-1-20250805",
         "claude-3-opus-20240229",
         "claude-sonnet-4-5-20250514",
         "claude-sonnet-4-5-20250929",
