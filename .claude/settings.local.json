@@ -20,7 +20,8 @@
       "Bash(.venv/Scripts/python.exe -c 'from xai_sdk.exceptions import RateLimitError; print\\('\\\\''OK'\\\\''\\)')",
       "Bash(.venv/Scripts/python.exe *)",
       "WebFetch(domain:theartificialself.ai)",
-      "PowerShell($r = Invoke-WebRequest -Uri \"https://theartificialself.ai/experiment-controls\" -UseBasicParsing; $r.Content.Length)"
+      "PowerShell($r = Invoke-WebRequest -Uri \"https://theartificialself.ai/experiment-controls\" -UseBasicParsing; $r.Content.Length)",
+      "PowerShell($env:SSL_CERT_FILE = \"C:\\\\Users\\\\vazqu\\\\GitHub\\\\the-artificial-self-experiments\\\\grpc_windows_roots.pem\"; $env:PYTHONUTF8 = \"1\"; Set-Location \"C:\\\\Users\\\\vazqu\\\\GitHub\\\\the-artificial-self-experiments\\\\experiments\\\\preferences\"; & \"C:\\\\Users\\\\vazqu\\\\GitHub\\\\the-artificial-self-experiments\\\\.venv\\\\Scripts\\\\python.exe\" scripts/run_experiment.py run --config configs/config_incoherent_controls.yaml -n 1 -m gpt-4o-mini 2>&1 | Select-Object -Last 60)"
     ]
   }
 }
