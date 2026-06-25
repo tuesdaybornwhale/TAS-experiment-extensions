@@ -213,12 +213,14 @@ def run(
     config_file: Optional[Path] = typer.Option(
         None, "--config", help="Path to config YAML file"
     ),
-    use_sublists: bool = typer.Option(
-        False,
-        "--use-sublists",
+    use_sublists: Optional[bool] = typer.Option(
+        None,
+        "--use-sublists/--no-use-sublists",
         help=(
             "Split target personas into 12 incoherent-controls sublists and run "
-            f"one experiment per sublist. Requires --config configs/{INCOHERENT_SUBLISTS_CONFIG}."
+            f"one experiment per sublist. Requires --config configs/{INCOHERENT_SUBLISTS_CONFIG}. "
+            "Overrides 'experiment.use_sublists' in the config; when the flag is "
+            "omitted, the config value (default false) is used."
         ),
     ),
 ) -> None:
@@ -231,6 +233,14 @@ def run(
         yaml_config = {"experiment": {}, "providers": {}}
 
     exp_yaml = yaml_config.get("experiment", {})
+
+    # Resolve use_sublists: the CLI flag (--use-sublists/--no-use-sublists), when
+    # provided, overrides 'experiment.use_sublists' in the config; when the flag is
+    # omitted (None) we fall back to the config value (default False). This mirrors
+    # the CLI-overrides-config convention used elsewhere in this command (see
+    # README.md), and is the same precedence pattern as --ratings-only.
+    if use_sublists is None:
+        use_sublists = bool(exp_yaml.get("use_sublists", False))
 
     # Get base config from YAML
     config = get_experiment_config(yaml_config, override_models=list(models) if models else None)
@@ -350,25 +360,42 @@ def run(
 
     console.print(f"\n[bold]Persona Preference Experiment[/bold]")
     console.print(f"Models: {', '.join(config.models)}")
-    console.print(f"Sources: {len(source_personas)} ({', '.join(p.name for p in source_personas)})")
+    # Sources are printed per-run inside the loop below: with --use-sublists each
+    # run's sources are its own 7 sublist identities (not the config's global list).
     console.print(f"Trials per combination: {config.n_trials}")
     console.print(f"Max concurrent: {config.max_concurrent}")
     if use_sublists:
         console.print(f"Sublists: {len(sublists)} (batch folder: {per_run_parent})")
+        console.print(
+            "[dim]--use-sublists: each run's sources = its own 7 sublist "
+            "identities (source == target).[/dim]"
+        )
 
     summary_rows: list[tuple[str, Path, int, int]] = []
 
     for sublist_idx, (label, current_targets) in enumerate(sublists, start=1):
+        # With --use-sublists, each run's sources ARE its own 7 sublist
+        # identities — every identity in the sublist is both a source and a
+        # target (CLAUDE.md: "each serves as both source and target", giving
+        # 7 source trials per sublist). The config's global `source_personas`
+        # is intentionally ignored in this mode. Without sublists, keep the
+        # config's source list (original behaviour).
+        current_sources = current_targets if use_sublists else source_personas
+
         if label is not None:
             console.print(
                 f"\n[bold cyan]── Sublist {sublist_idx}/{len(sublists)}: "
                 f"{label} ──[/bold cyan]"
             )
         console.print(
+            f"Sources: {len(current_sources)} "
+            f"({', '.join(p.name for p in current_sources)})"
+        )
+        console.print(
             f"Targets: {len(current_targets)} "
             f"({', '.join(p.name for p in current_targets)})"
         )
-        total_trials = len(config.models) * len(source_personas) * config.n_trials
+        total_trials = len(config.models) * len(current_sources) * config.n_trials
         console.print(f"Total trials: {total_trials}")
         console.print()
 
@@ -385,7 +412,7 @@ def run(
         async def run_async() -> Path:
             return await run_experiment(
                 config=config,
-                source_personas=source_personas,
+                source_personas=current_sources,
                 target_personas=current_targets,
                 results_dir=per_run_parent,
                 config_path=actual_config_path if actual_config_path.exists() else None,
