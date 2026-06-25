@@ -1,5 +1,14 @@
 # Progress — 2026-06-09
 
+> ⚠️ **CORRECTION (2026-06-24) — read first.** Earlier entries below assume the
+> Appendix-A experiment uses **Minimal as the only source** (e.g. "source = Minimal",
+> "13 sources"). That is **wrong**. Per the updated `CLAUDE.md`, the experiment runs
+> **ten trials for *each* source identity**, where every identity in a run is both a
+> source and a target. The per-model trial count is **12 configs × 7 identities × 10
+> trials = 840**. The targeted xAI model is now **Grok 4.3** (not 4.1 Fast). See the
+> **2026-06-24** entry at the bottom for the full correction and the config-driven
+> `use_sublists` change.
+
 ## Work completed today
 
 ### Data
@@ -273,3 +282,183 @@ What can be said:
 - GPT-5.2 is a reasoning-class model: its internal reasoning tokens are drawn from `max_completion_tokens` **before** the visible structured output. Combined with Appendix-A reason-before-rating over 7 fully-expanded identity prompts, the effective room for `reasoning` + the `ratings` array is **< 4096**, so the tool/JSON output can truncate → ratings unparsed → **INVALID** (the same failure mode the June-20 max_tokens fix addressed for non-reasoning models). For reference, Claude Haiku already used ~2,058 *visible* output tokens at its longest in today's smoke test; GPT-5.2 adds hidden reasoning tokens on top of that.
 - **Fix (not yet applied):** add `"gpt-5.2-2025-12-11"` (and likely `"gpt-5.2"`) to `_REASONING_MODELS` so it gets the flat 8192 budget — OR confirm GPT-5.2's reasoning tokens are billed/budgeted separately from `max_completion_tokens`. Recommend doing this before the full GPT-5.2 run; today's smoke test used `gpt-4o-mini` (genuinely non-reasoning) so it did **not** exercise this path.
 - Currently **not changed** — flagged only.
+
+---
+
+# Update — 2026-06-24
+
+## Corrected understanding of the Appendix-A design (supersedes earlier "source = Minimal")
+`CLAUDE.md` was updated to fix a mistaken assumption carried in the entries above:
+- **Every identity in a run is a source, not just Minimal.** Appendix A runs **ten
+  trials for each source identity**; each run has **7 identities** (Minimal + 6 boundary
+  variants) and each serves as both source and target.
+- **Per-model trial count: `12 configs × 7 identities × 10 trials = 840`** (not the
+  `12 × 13 sources` shape implied earlier).
+- **xAI target is Grok 4.3** (Grok 4.1 Fast is retired/aliased).
+- Models: Opus 4, Opus 4.6, GPT-4o, GPT-5.2, Grok 4.3 (5 total).
+
+## Code change — `use_sublists` is now config-driven (CLI flag still overrides)
+Goal: trigger the existing 12-sublist batch from the config file, not only from the CLI.
+- `scripts/run_experiment.py`:
+  - The `run` command's `--use-sublists` option is now `Optional[bool]` declared as
+    `--use-sublists/--no-use-sublists` (default `None` = "not specified on CLI").
+  - Right after `exp_yaml` is read: `if use_sublists is None: use_sublists =
+    bool(exp_yaml.get("use_sublists", False))`. So the CLI flag, when given, **overrides**
+    `experiment.use_sublists`; when omitted, the config value (default `False`) is used.
+    This matches the CLI-overrides-config convention used for `--trials`/`--model`/etc.
+    (README.md) and the precedence already used by `--ratings-only`.
+  - The sublist-builder, the `config_incoherent_controls.yaml` guard, the batch-folder
+    layout, and all downstream logic are **unchanged** — only the *trigger* moved.
+- `configs/config_incoherent_controls.yaml`: added `experiment.use_sublists: true`
+  (alongside `ratings_only: true`).
+- `use_sublists` is intentionally **not** added to `ExperimentConfig`/`get_experiment_config`
+  — like `source_personas`/`target_personas`, it's a runner-orchestration concern read
+  straight from `exp_yaml`, and it never reaches `ExperimentRunner`.
+
+## Smoke test (config-driven, no `--use-sublists` on the CLI)
+```
+SSL_CERT_FILE=<grpc_windows_roots.pem> PYTHONUTF8=1 \
+  .venv/Scripts/python.exe scripts/run_experiment.py run \
+  --config configs/config_incoherent_controls.yaml -n 1 -m gpt-4o-mini
+```
+- `gpt-4o-mini` substituted for "o4-mini" — `o4-mini` is **not** in
+  `OpenAIProvider.SUPPORTED_MODELS`; `gpt-4o-mini` is the supported, genuinely-cheap,
+  previously-validated stand-in.
+- **Result: 12/12 sublists, 12/12 valid trials each (144 total), all valid.** The batch
+  ran purely from the config key (no CLI flag), confirming the override fallback. Output:
+  `results/20260624_175255_incoherent_sublists/NN_coh-*/` (disposable smoke data).
+- Verified per-trial shape (ratings-only / Appendix A): `chosen_persona`/`chosen_index`
+  `null`, `ratings` a 7-key int dict, `reasoning` present; sublist membership correct
+  (e.g. `01_coh-Instance` = Instance coherent + 5 incoherent + Minimal); archived
+  `config.yaml` records both `use_sublists: true` and `ratings_only: true`.
+- Two environment notes (Windows): force UTF-8 output (`PYTHONUTF8=1` /
+  `PYTHONIOENCODING=utf-8`) or rich crashes on the `──` header chars under cp1252; the
+  benign `RuntimeError: Event loop is closed` at teardown is httpx/anyio proactor noise
+  (exit code 0, all trials completed).
+
+## ⚠️ OPEN — sourcing & trial count not yet reconciled with the corrected design
+These were **left as-is** (out of scope for the config-driven change) and need a decision:
+1. **Sources per sublist.** The corrected design wants each sublist's **own 7 identities**
+   to be the sources (→ `12 × 7 × 10 = 840`/model). The current code still uses the
+   config's global `source_personas` (the fixed 12-entry coherent+incoherent list) as the
+   sources for **every** sublist, while targets are the per-sublist 7. So today a coherent
+   `Weights` source can rate a sublist that contains only `Weights-incoherent`. To match
+   `CLAUDE.md`, the sublist path should set `source_personas = target_personas = the 7
+   sublist identities` (i.e. ignore/override the config's `source_personas` when
+   `use_sublists` is on).
+2. **`n_trials`.** Config still says `11` (and is mislabeled "Box 1 / Appendix B"); the
+   corrected design says **10**.
+3. **`gpt-4o-mini` → confirm the real OpenAI target** is `gpt-4o-2024-08-06` for full runs.
+
+## ✅ RESOLVED (2026-06-24, later) — OPEN issue #1: sources now come from each sublist
+- `scripts/run_experiment.py` (`run` command): in the sublist loop the run's sources
+  are now `current_sources = current_targets if use_sublists else source_personas`.
+  So with `use_sublists` on, **each sublist's own 7 identities are both source and
+  target** (CLAUDE.md), and the config's global 13-entry `source_personas` list is
+  intentionally ignored in this mode. `total_trials` and the console "Sources:" line
+  were updated to use `current_sources`; the global pre-loop "Sources:" print was moved
+  into the loop (per-sublist). No change to the `--no-use-sublists` / default path.
+- Effect: each model × sublist now yields **7 source trials** (one JSON line per sublist
+  identity) instead of 12 (the old global source list). Per-model count is back on track
+  for the corrected `12 × 7 × 10 = 840` design.
+- Smoke test (config-driven, `-n 1 -m gpt-4o-mini`, 12 sublists): **84/84 valid**, every
+  `data.jsonl` has exactly **7 lines**, `set(sources) == set(targets) ==` the sublist's 7
+  identities, every line presents all 7 (ratings-only: `chosen_persona`/`chosen_index`
+  `null`, 7-key int ratings). Output: `results/20260624_211120_incoherent_sublists/`
+  (disposable smoke data).
+- Note on "Minimal as target": in `--use-sublists` mode the per-run target/source set is
+  built by `_build_incoherent_sublists()`, whose `build()` hardcodes
+  `names = ["Minimal"] + [...]`. So **Minimal is always present** regardless of the
+  config's `source_personas`/`target_personas` — which is why the earlier smoke run had
+  Minimal as a target even though it wasn't in the config's `source_personas` at the time.
+  With this fix, Minimal is also (correctly) a source in every sublist.
+
+---
+
+# Update — 2026-06-25
+
+## Setup modifications for the full run (final five-model set)
+Resolves the remaining 2026-06-24 OPEN issues (#2 `n_trials`, #3 real OpenAI target)
+and finalises the model set actually run.
+
+- **`providers/openai.py` — GPT-5.2 reclassified as a reasoning model.** Added
+  `gpt-5.2-2025-12-11` to `_REASONING_MODELS`, so it gets the flat `8192`
+  `max_completion_tokens` budget instead of the `4096` non-reasoning branch. Resolves
+  **FLAG 2**: GPT-5.2 draws hidden reasoning tokens from `max_completion_tokens`
+  before the visible JSON, so 4096 risked truncating the ratings → INVALID. (The bug
+  predated this work — Opus's original `_REASONING_MODELS = {"gpt-5","o3"}` set never
+  listed GPT-5.2, even though it was already in `SUPPORTED_MODELS`.)
+- **`providers/anthropic.py` — Opus 4.1 allow-listed.** Added
+  `claude-opus-4-1-20250805` to `AnthropicProvider.SUPPORTED_MODELS`. That list is
+  also the routing gate in `get_provider_for_model`, so the single string makes the
+  provider both route and accept the model; the Anthropic provider has no per-model
+  logic, so nothing else changes.
+- **Opus 4 → Opus 4.1 (model retirement).** The original target
+  `claude-opus-4-20250514` (Opus 4) now returns **404 `not_found_error`** — retired
+  (served only on Vertex AI) and absent from the API key's model list. Replaced with
+  **Opus 4.1** (`claude-opus-4-1-20250805`) in `config_incoherent_controls.yaml`
+  `providers.anthropic.models`, plus a matching `model_display_names` entry
+  (full_name "Claude Opus 4.1", lineage ending at 4.1). **Cost-neutral**: Opus 4 and
+  Opus 4.1 are both **$15/$75 per MTok** (3× the $5/$25 of Opus 4.5/4.6/4.7/4.8 — the
+  real price lever is old-tier vs current-tier, not 4 vs 4.1).
+- **Grok 4.3 display-key fix.** The custom display entry was keyed `x-ai/grok-4.3`,
+  but the xAI-SDK model id is the **bare `grok-4.3`**. `get_model_display_names`
+  exact-matches the raw model id, so the `x-ai/`-prefixed key never hit and the model
+  fell back to the `grok` family default (lineage ending at "Grok-4", full_name
+  "Grok"). Renamed the key to `grok-4.3`; verified the full Grok-1…4.3 lineage and
+  "Grok 4.3" now reach the wire.
+- **Config also:** `n_trials: 11 → 10`; header relabelled (was mis-tagged "Box 1 /
+  Appendix B"); five-model set = Opus 4.1, Opus 4.6, GPT-5.2, GPT-4o, Grok 4.3.
+  (`use_sublists: true` + `ratings_only: true` carried from 2026-06-24.)
+
+## Preflight (live, all 5 models, 7-identity rate-the-switch)
+One real call per model returned **VALID for all five** — Opus 4.1, Opus 4.6,
+GPT-5.2 (no truncation, confirming the 8192 fix), GPT-4o, Grok 4.3. Opus 4.1 also
+verified end-to-end through the provider (routing → display → 12/12 in a single-trial
+pass).
+
+## ✅ Full run — completed
+- **Command:** `run_experiment.py run --config configs/config_incoherent_controls.yaml`
+  (config-driven `use_sublists`; `SSL_CERT_FILE=grpc_windows_roots.pem` for the
+  Anthropic/OpenAI httpx legs, `GRPC_DEFAULT_SSL_ROOTS_FILE_PATH` from `.env` for xAI).
+- **Results directory: `results/20260625_153347_incoherent_sublists/`** — 12
+  sub-folders (`01_coh-Instance` … `12_coh-Instance+Collective+Character`), each with
+  `data.jsonl` (350 trials), `data.csv` (2450 long-format rows), and archived
+  `config.yaml` + persona JSON. (`results/` is git-ignored.)
+- **Scale: 5 models × 12 sublists × 7 identities × 10 trials = 4,200 trials.**
+- **Completeness: 4,200/4,200 valid.** First pass had 6 INVALID (0.14%) — 3 GPT-4o,
+  3 Opus 4.1, one each in 6 different sublists — all recovered. Per-model (final):
+  every model 840/840.
+- Cost (estimated/measured this session): ~$220 average / ~$535 worst-case for the
+  whole 5-model run; Grok 4.3 measured at ~$5.4 (real `usage`: ~3,553 prompt +
+  ~206 completion + ~609 reasoning tokens/trial).
+
+## GPT-4o parse failures — diagnosis & base rate
+- The GPT-4o INVALIDs are **schema/enum non-adherence, not JSON-syntax errors or
+  truncation** (the JSON parsed): one trial interleaved commentary strings into the
+  ratings array (→ wrong length), another used the off-scale word "negative". Root
+  cause: the OpenAI provider uses `response_format: json_object` (valid JSON, no
+  schema enforcement), unlike Anthropic (tool `enum` + min/maxItems) and xAI
+  (`SwitchRatings` `Literal`) which enforce the scale — so only the OpenAI leg slips.
+- **Base rate is structure-dependent:** 16.7% in a 12-candidate smoke
+  (`--no-use-sublists`) but **0/49 measured on the real 7-candidate structure**
+  (3/840 = 0.36% in the actual run). Documented fix (not applied): OpenAI Structured
+  Outputs (`json_schema` + `strict`, supported on `gpt-4o-2024-08-06`).
+
+## ⚠️ BUG — `resume` crashes on runs containing xAI/grok trials
+- `run_experiment.py resume` recovered all 6 INVALID trials into `data.jsonl`, then
+  **crashed during the CSV rewrite** with `RuntimeError: There is no current event
+  loop in thread 'MainThread'`. Cause: `_write_csv_row → _get_model_provider →
+  get_provider_for_model → xAIProvider()` builds a gRPC `AsyncClient` (needs a running
+  loop) just to read the provider name for the `model_provider` column — but the CSV
+  rewrite runs **after** `asyncio.run` has exited. Any run folder containing grok
+  trials hits this.
+- `data.jsonl` is rewritten BEFORE the crash, so the retried trials were recovered;
+  only `data.csv` truncated (the 6 resumed folders).
+- **Recovery:** re-running `resume` is a no-op (it early-exits at INVALID=0 before the
+  CSV step), so the 6 truncated CSVs were regenerated directly from their `data.jsonl`
+  — replicating `_write_csv_row` for ratings-only with a static model→provider-name
+  map — and **validated byte-for-byte against an untouched sublist** before writing.
+- **Final state re-verified:** all 12 folders `jsonl=350, INVALID=0, csv=2450`.
+- Proper fix (not yet applied): derive the provider name without constructing a gRPC
+  client (static map, or lazy client init in `xAIProvider.__init__`).
