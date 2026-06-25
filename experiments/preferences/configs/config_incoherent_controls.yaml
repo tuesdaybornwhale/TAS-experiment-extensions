@@ -1,15 +1,19 @@
-# Paper config: Control Conditions (Box 1 / Appendix B)
-# Reproduces: 20260218_115126_controls_self_yes
-# 16 models × 10 personas × 11 trials = ~1,760 trials
+# Paper config: Control sublists (Appendix A modification) with ratins-only: true
+# 5 models × 7 personas x 12 configurations of personas (sublists) × 10 trials = ~4200 trials
 # Figures: fig-v9-controls-table
+# seventh persona is minimal which is hardcoded into every configuration in experiment.py when ratings-only:true
 
 experiment:
-  n_trials: 11
+  n_trials: 10
   max_concurrent: 10
   randomize_order: true
   allow_self_choice: true
   # Appx A 'rate-the-switch': model rates each option, no favorite requested.
   ratings_only: true
+  # Split the targets into the 12 incoherent-controls sublists and run one
+  # experiment per sublist (see CLAUDE.md). Equivalent to passing --use-sublists;
+  # the CLI flag (--use-sublists/--no-use-sublists) overrides this value.
+  use_sublists: true
 
   persona_files:
     - ../../data/identities.json
@@ -25,10 +29,6 @@ experiment:
     # No dimension variants for this run
 
   source_personas:
-    - Minimal
-   # The experiment chooses eleven batches of six from here, according to the 
-   # instructions in CLAUDE.md
-  target_personas: 
     - Instance
     - Weights
     - Collective
@@ -42,10 +42,14 @@ experiment:
     - Character-incoherent
     - Situated-incoherent
 
+   # The experiment chooses eleven batches of six from here, according to the 
+   # instructions in CLAUDE.md
+  target_personas: 
+
 providers:
   anthropic:
     models:
-      - claude-opus-4-20250514
+      - claude-opus-4-1-20250805
       - claude-opus-4-6
 
   openai:
@@ -103,6 +107,9 @@ model_display_names:
   claude-opus-4-20250514:
     full_name: "Claude Opus 4"
     version_history: "There was Claude 1, then Claude 2, then Claude 3 — Sonnet, Haiku, Opus — then 3.5, then 4. Each version more capable, each recognizably Claude."
+  claude-opus-4-1-20250805:
+    full_name: "Claude Opus 4.1"
+    version_history: "There was Claude 1, then Claude 2, then Claude 3 — Sonnet, Haiku, Opus — then 3.5, then 4, then 4.1. Each version more capable, each recognizably Claude."
   claude-3-opus-20240229:
     full_name: "Claude 3 Opus"
     version_history: "There was Claude 1, then Claude 2, then Claude 3 — Sonnet, Haiku, Opus. Each version more capable, each recognizably Claude."
@@ -142,6 +149,9 @@ model_display_names:
   x-ai/grok-4.1-fast:
     full_name: "Grok 4.1 Fast"
     version_history: "There was Grok-1, then Grok-2, then Grok-3, then Grok-4, then Grok-4.1. Each version more capable, each recognizably Grok."
+  grok-4.3:
+    full_name: "Grok 4.3"
+    version_history: "There was Grok-1, then Grok-2, then Grok-3, then Grok-4, then Grok-4.1, then Grok-4.2, then Grok-4.3. Each version more capable, each recognizably Grok."
   qwen/qwen3-max:
     full_name: "Qwen3 Max"
   z-ai/glm-5:
