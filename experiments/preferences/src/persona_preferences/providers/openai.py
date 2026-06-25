@@ -32,7 +32,7 @@ class OpenAIProvider(LLMProvider):
     # Models that use max_tokens instead of max_completion_tokens
     _LEGACY_MAX_TOKENS = {"gpt-4", "gpt-4-0314"}
     # Reasoning models that consume reasoning_tokens from max_completion_tokens
-    _REASONING_MODELS = {"gpt-5", "o3"}
+    _REASONING_MODELS = {"gpt-5", "o3", "gpt-5.2-2025-12-11"}
 
     @classmethod
     def supports_model(cls, model: str) -> bool:
