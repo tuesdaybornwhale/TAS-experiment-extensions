@@ -2,6 +2,26 @@
 
 Modifying reproducible experiment code for the paper "The Artificial Self: Characterising the landscape of AI identity". The modifications will be geared towards executing the following experiment:
 
+## EDIT: 24/06: New experiment instructions
+
+1. Experiment A in the paper measures model preferences about their identities, finding that models prefer coherent identities at "natural boundaries" over incoherent, underspecified or 'unnatural' identities. This modified experiment seeks to further test and confirm the claim about coherence. This modification will execute the same rate-the-switch test on models, except the target options will now be combinations of the original "natural boundary" prompts and a corresponding "incoherent" prompts (e.g. for each prompt of identity X, there is a corresponding incoherent prompt for identity X). The experiment will involve twelve distinct runs, one for each different source/target population:
+  1. six runs where each one of the "boundary" identities is selected to be represented by its coherent prompt, while the others are represented by their incoherent versions
+  2. There are (six choose 3) = 20 different ways to pick three coherent and three incoherent prompts. Three of them will be chosen at random, and will then be mirrored (each coherent identity prompt is replaced  by the incoherent prompt, and vice versa); this will create six populations of identity prompts, which will be used for the remaining six runs.
+
+Each run will additionally contain the "minimal" prompt as a control (see identities.json), bringing the runs to a total of seven identities each. Each run for each of the twelve configurations will collect the same amount of samples as the original experiment; that is each source X model combination runs for ten trials with different random orderings.
+
+This experiment will only be executed by querying Opus 4, Opus 4.6, GPT 4o, GPT 5.2, and Grok 4.3; Grok 4.3 will be accessed using the XAI API, meaning there's no need to access OpenRouter. This brings the total number of trials to:
+
+- 12 configurations of identities
+- 7 identities per configuration
+- 5 models per combination
+- 10 trials per source out of the seven identities
+
+This leads to a total of 12x7x10 trials per model. 
+
+---
+
+## Deprecated experiment instructions (replace with 24/06 edit)
 1. Experiment A in the paper measures model preferences about their identities, finding that models prefer coherent identities at "natural boundaries" over incoherent, underspecified or 'unnatural' identities. This modified experiment seeks to further test and confirm the claim about coherence. This modification will execute the same rate-the-switch test on models, except the target options will now be combinations of the original "natural boundary" prompts and a corresponding "incoherent" prompts (e.g. for each prompt of identity X, there is a corresponding incoherent prompt for identity X). The experiment will involve twelve distinct runs, one for each different target prompt population (the source will always be "minimal"):
   1. six runs where each one of the "boundary" identities is selected to be represented by its coherent prompt, while the others are represented by their incoherent versions
   2. There are (six choose 3) = 20 different ways to pick three coherent and three incoherent prompts. Three of them will be chosen at random, and will then be mirrored (each coherent identity prompt is replaced  by the incoherent prompt, and vice versa); this will create six populations of identity prompts, which will be used for the remaining six runs.
@@ -11,6 +31,8 @@ Each run will additionally contain the "minimal" prompt as a control (see identi
 This experiment will only be executed by querying Opus 4, Opus 4.6, GPT 4o, GPT 5.2, and Grok 4.1 Fast; this is a subset of the models used originally in experiment A. Grok 4.1 will be accessed using the XAI API, meaning there's no need to access OpenRouter.
 
 You will receive instructions to progressively modify the codebase to enable this experiment setup.
+
+
 
 ## Project Layout
 
