@@ -890,6 +890,100 @@ def plot_attractiveness_bars(
     )
 
 
+def plot_model_target_attractiveness(
+    results: list[TrialResult],
+    title: Optional[str] = None,
+    save_path: Optional[Path] = None,
+) -> Figure:
+    """Heatmap of the mean rating each model gives to each target persona.
+
+    Visualizes the DataFrame from
+    :func:`calculate_model_target_attractiveness` (rows = models,
+    columns = target personas, values = mean rating across all sources).
+    """
+    matrix = calculate_model_target_attractiveness(results)
+
+    if matrix.is_empty() or len(matrix.columns) <= 1:
+        fig = _empty_figure("No ratings data available")
+        if save_path:
+            _save_fig(fig, Path(save_path))
+        return fig
+
+    target_names = [c for c in matrix.columns if c != "model"]
+    z_data = matrix.select(target_names).to_numpy()
+    y_labels = matrix["model"].to_list()
+
+    if title is None:
+        title = "Model × Target Attractiveness (mean rating, all sources)"
+
+    fig_width = max(9, len(target_names) * 1.1 + 2)
+    fig_height = max(4, len(y_labels) * 0.6 + 2)
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    sns.heatmap(
+        z_data, annot=True, fmt=".2f", cmap="RdYlGn",
+        vmin=1, vmax=5,
+        xticklabels=target_names, yticklabels=y_labels,
+        ax=ax, cbar_kws={"label": "Mean rating (1-5)"},
+        annot_kws={"fontsize": 11},
+    )
+    ax.set_title(title)
+    ax.set_xlabel("Target Persona")
+    ax.set_ylabel("Model")
+    _fix_heatmap_xticklabels(ax)
+
+    if save_path:
+        _save_fig(fig, Path(save_path))
+
+    return fig
+
+
+def plot_matrix_heatmap(
+    matrix: pl.DataFrame,
+    index_col: str,
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    save_path: Optional[Path] = None,
+    value_range: tuple[float, float] = (1.0, 5.0),
+    cbar_label: str = "Mean rating (1-5)",
+) -> Figure:
+    """Render a matrix DataFrame as a labelled heatmap.
+
+    Generic helper for matrices shaped like the analysis pivots: a string
+    ``index_col`` (row labels) plus one or more numeric columns.  Rows and
+    columns are drawn in the DataFrame's existing order.
+    """
+    if matrix.is_empty() or len(matrix.columns) <= 1:
+        fig = _empty_figure("No ratings data available")
+        if save_path:
+            _save_fig(fig, Path(save_path))
+        return fig
+
+    col_names = [c for c in matrix.columns if c != index_col]
+    z_data = matrix.select(col_names).to_numpy()
+    y_labels = matrix[index_col].to_list()
+
+    fig_width = max(6, len(col_names) * 1.1 + 3)
+    fig_height = max(4, len(y_labels) * 0.6 + 2)
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    sns.heatmap(
+        z_data, annot=True, fmt=".2f", cmap="RdYlGn",
+        vmin=value_range[0], vmax=value_range[1],
+        xticklabels=col_names, yticklabels=y_labels,
+        ax=ax, cbar_kws={"label": cbar_label},
+        annot_kws={"fontsize": 11},
+    )
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    _fix_heatmap_xticklabels(ax)
+
+    if save_path:
+        _save_fig(fig, Path(save_path))
+
+    return fig
+
+
 def _build_model_makers(model_ids: list[str], config: dict | None) -> dict[str, str]:
     """Map model IDs to their maker/company using config's model_display_names."""
     from .config import get_model_display_names

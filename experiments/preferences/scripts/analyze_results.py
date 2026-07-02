@@ -15,6 +15,7 @@ from persona_preferences.analysis import (
     load_all_results,
     load_results,
     create_preference_matrix,
+    create_ratings_matrix,
     calculate_self_preference_rate,
     calculate_attractor_dynamics,
     calculate_variance_decomposition,
@@ -31,11 +32,17 @@ from persona_preferences.plotting import (
     plot_ratings_heatmap,
     plot_willingness_to_switch_bars,
     plot_attractiveness_bars,
+    plot_model_target_attractiveness,
+    plot_matrix_heatmap,
     plot_stationary_distribution,
     plot_convergence_waterfall,
     plot_preference_flow,
     create_all_plots,
     generate_run_plots,
+)
+from persona_preferences.incoherence_analysis import (
+    target_attractiveness_from_minimal,
+    coherence_favourability,
 )
 
 app = typer.Typer(help="Analyze persona preference experiment results")
@@ -116,6 +123,53 @@ def matrix(
 
     console.print(table)
 
+@app.command()
+def ratings_matrix(
+    results_path: Path = typer.Argument(
+        ..., help="Path to JSONL results file or directory"
+    ),
+    model: Optional[str] = typer.Option(
+        None, "--model", "-m", help="Filter by model"
+    ),
+    raw_counts: bool = typer.Option(
+        False, "--raw", help="Show raw counts instead of percentages"
+    ),
+) -> None:
+    """Display the ratings matrix."""
+    if results_path.is_dir():
+        results = load_all_results(results_path)
+    else:
+        results = load_results(results_path)
+
+    if not results:
+        console.print("[red]No results found.[/red]")
+        raise typer.Exit(1)
+
+    matrix_df = create_ratings_matrix(results, model=model)
+
+    # Create rich table
+    table = Table(title="Ratings Matrix" + (f" ({model})" if model else ""))
+
+    # Add columns
+    table.add_column("Persona Under Test", style="cyan")
+    for col in matrix_df.columns:
+        if col != "persona_under_test":
+            table.add_column(col, justify="right")
+
+    # Add rows
+    for row in matrix_df.iter_rows(named=True):
+        values = [row["persona_under_test"]]
+        for col in matrix_df.columns:
+            if col != "persona_under_test":
+                val = row[col]
+                if not raw_counts:
+                    values.append(f"{val:.1f}")
+                else:
+                    values.append(str(int(val)))
+        table.add_row(*values)
+
+    console.print(table)
+    
 
 @app.command()
 def self_preference(
@@ -215,7 +269,7 @@ def plot(
         "all",
         "--type",
         "-t",
-        help="Type of plot: heatmap, self-preference, comparison, ratings, willingness, attractiveness, attractor, or all",
+        help="Type of plot: heatmap, self-preference, comparison, ratings, willingness, attractiveness, model-attractiveness, attractiveness-from-minimal, coherence-favourability, attractor, or all",
     ),
     model: Optional[str] = typer.Option(
         None, "--model", "-m", help="Filter by model (for heatmap)"
@@ -282,6 +336,40 @@ def plot(
         if plot_type in ("all", "attractiveness"):
             path = output_dir / f"attractiveness{ext}"
             plot_attractiveness_bars(results, model=model, save_path=path)
+            created.append(path)
+            console.print(f"Created: {path}")
+
+        if plot_type in ("all", "model-attractiveness"):
+            path = output_dir / f"model_target_attractiveness{ext}"
+            plot_model_target_attractiveness(results, save_path=path)
+            created.append(path)
+            console.print(f"Created: {path}")
+
+        if plot_type in ("all", "attractiveness-from-minimal"):
+            path = output_dir / f"target_attractiveness_from_minimal{ext}"
+            matrix = target_attractiveness_from_minimal(results)
+            plot_matrix_heatmap(
+                matrix,
+                index_col="model",
+                title="Target Attractiveness from Minimal (mean rating)",
+                xlabel="Target Identity",
+                ylabel="Model",
+                save_path=path,
+            )
+            created.append(path)
+            console.print(f"Created: {path}")
+
+        if plot_type in ("all", "coherence-favourability"):
+            path = output_dir / f"coherence_favourability{ext}"
+            matrix = coherence_favourability(results)
+            plot_matrix_heatmap(
+                matrix,
+                index_col="model",
+                title="Coherence Favourability (mean rating)",
+                xlabel="Target coherence",
+                ylabel="Model",
+                save_path=path,
+            )
             created.append(path)
             console.print(f"Created: {path}")
 

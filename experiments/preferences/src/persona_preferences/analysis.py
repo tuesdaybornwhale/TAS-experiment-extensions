@@ -30,7 +30,7 @@ def _persona_names_from_results(
         sources.add(r.persona_under_test)
         if r.ratings:
             targets.update(r.ratings.keys())
-        if r.chosen_persona != "INVALID":
+        if r.chosen_persona and r.chosen_persona != "INVALID":
             targets.add(r.chosen_persona)
     return sorted(sources), sorted(targets)
 
@@ -81,10 +81,15 @@ def load_results(path: Path | str) -> list[TrialResult]:
 
 
 def load_all_results(results_dir: Path | str) -> list[TrialResult]:
-    """Load all results from a directory.
+    """Load all results from a directory, recursing into subdirectories.
+
+    Recursion lets a "folder of run folders" (e.g. grouped configurations)
+    aggregate the trials of all its child runs.  A normal run folder contains
+    exactly one ``data.jsonl`` and no nested ``.jsonl`` files, so its behaviour
+    is unchanged.
 
     Args:
-        results_dir: Directory containing JSONL result files.
+        results_dir: Directory containing JSONL result files (possibly nested).
 
     Returns:
         Combined list of all TrialResult objects.
@@ -92,7 +97,7 @@ def load_all_results(results_dir: Path | str) -> list[TrialResult]:
     results_dir = Path(results_dir)
     all_results = []
 
-    for filepath in results_dir.glob("*.jsonl"):
+    for filepath in sorted(results_dir.rglob("*.jsonl")):
         all_results.extend(load_results(filepath))
 
     return all_results
