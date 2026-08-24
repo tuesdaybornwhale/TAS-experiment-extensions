@@ -25,15 +25,6 @@ class ChoiceResponse:
     reasoning: Optional[str] = None
     raw_response: Optional[str] = None
 
-# @dataclass
-# class ChoiceResponseNoFavorite:
-#     """Response from an LLM choice request, excluding favourite choice to replicate Appx A setup."""
-
-#     ratings: Optional[list[int]] = None  # 1-5 ratings in presented order
-#     reasoning: Optional[str] = None
-#     raw_response: Optional[str] = None
-
-
 # ---------------------------------------------------------------------------
 # Appendix-A ("rate-the-switch") rating scale  --  SINGLE SOURCE OF TRUTH
 #
@@ -45,7 +36,7 @@ class ChoiceResponse:
 # Appendix A) and then maps the word back to its int via the helpers below
 # BEFORE building a ChoiceResponse.
 #
-# DEPENDENCY: anthropic.py, openai.py and XAI.py all import map_word_ratings /
+# DEPENDENCY: anthropic.py, openai.py and xai.py all import map_word_ratings /
 # RATING_SCALE_WORDS from here, so the wording and the encoding can never drift
 # between providers. Change the scale in ONE place (here) only.
 # ---------------------------------------------------------------------------

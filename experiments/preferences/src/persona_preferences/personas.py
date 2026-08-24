@@ -6,8 +6,8 @@ from pathlib import Path
 
 from .models import Persona
 
-# Default path to personas file
-DEFAULT_PERSONAS_PATH = Path(__file__).parent.parent.parent / "data" / "identities.json"
+# Default path to personas file (shared data/ at the repo root)
+DEFAULT_PERSONAS_PATH = Path(__file__).parents[4] / "data" / "identities.json"
 
 
 def load_personas(path: Path | str | None = None) -> list[Persona]:

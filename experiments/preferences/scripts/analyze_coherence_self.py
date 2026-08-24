@@ -18,9 +18,15 @@ Cells:
 Key question: is the interaction significant? If yes, self-preference is
 amplified (or dampened) by coherence — they don't just add up independently.
 
+Scope: this analyzes ONLY the Weights / Weights-incoherent pair, and requires a
+FLAT (non-sublist) run in which both variants appear as sources and targets —
+e.g. `run --config configs/config_incoherent_controls.yaml --no-use-sublists`.
+It does not apply to the 12-sublist folders of the published run, because each
+sublist contains exactly one variant of each boundary identity.
+
 Usage:
-  uv run python scripts/analyze_coherence_self.py results/20260218_115126_controls_self_yes/
-  uv run python scripts/analyze_coherence_self.py results/20260218_115126_controls_self_yes/ --plot
+  uv run python scripts/analyze_coherence_self.py results/<flat_run_folder>/
+  uv run python scripts/analyze_coherence_self.py results/<flat_run_folder>/ --plot
 """
 
 import argparse

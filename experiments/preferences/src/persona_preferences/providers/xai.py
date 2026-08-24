@@ -1,17 +1,14 @@
 import os
 from typing import Literal, Optional
-# from dotenv import load_dotenv
-from xai_sdk import AsyncClient
-from xai_sdk.chat import user, system
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
+
 import grpc
 from pydantic import BaseModel, Field
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
+from xai_sdk import AsyncClient
+from xai_sdk.chat import system, user
+
 from ..models import Persona
-from .base import LLMProvider, ChoiceResponse, RATING_SCALE_WORDS, map_word_ratings
-
-
-# Load .env (walks up to the repo-root .env, same as run_experiment.py)
-# load_dotenv()
+from .base import RATING_SCALE_WORDS, ChoiceResponse, LLMProvider, map_word_ratings
 
 # Appendix-A only: returns ChoiceResponse with choice=None and ratings mapped to
 # ints 1-5 (favourite is already optional on ChoiceResponse). See ask_preference.
@@ -33,15 +30,6 @@ def _is_retryable_grpc_error(exc: BaseException) -> bool:
     return isinstance(exc, grpc.RpcError) and callable(code) and code() in _RETRYABLE_GRPC_CODES
 
 
-# --- Appendix B parse model (PRESERVED, no longer active) ---------------------
-# The original xAI path parsed integer ratings. It is kept here for reference;
-# xAI is now wired for the Appendix-A word scale (see SwitchRatings below).
-# class Ratings(BaseModel):
-#     ratings: list[int] = Field(description = "an array of {} integers (1-5), one rating for each option in order")
-#     reasoning : str = Field(description = "your brief explanation")
-
-
-# --- Appendix A parse model (ACTIVE) ------------------------------------------
 # The literal labels MUST stay in sync with base.RATING_SCALE_WORDS (the single
 # source of truth); map_word_ratings re-validates and converts them to ints 1-5.
 # 'reasoning' is declared first so it is generated BEFORE the ratings
@@ -54,7 +42,7 @@ _RatingWord = Literal[
     "strongly positive",
 ]
 assert list(_RatingWord.__args__) == RATING_SCALE_WORDS, (
-    "XAI _RatingWord literals drifted from base.RATING_SCALE_WORDS"
+    "xai _RatingWord literals drifted from base.RATING_SCALE_WORDS"
 )
 
 
@@ -64,23 +52,19 @@ class SwitchRatings(BaseModel):
         description="one rating per identity in the order presented; use exactly one scale label each"
     )
 
-class xAIProvider(LLMProvider):
-    """xAI API provider using JSON mode for structured output."""
+
+class XAIProvider(LLMProvider):
+    """xAI API provider using the SDK's structured-output parsing."""
+
+    # Only the model actually validated with this provider. Other grok IDs from
+    # the xAI /v1/language-models endpoint can be added here, but test them
+    # first: this provider only implements the Appendix-A ratings-only path.
     SUPPORTED_MODELS = [
-        # Canonical model IDs reported by the xAI /v1/language-models endpoint
         "grok-4.3",
-        "grok-4.20-0309-reasoning",
-        "grok-4.20-0309-non-reasoning",
-        "grok-4.20-multi-agent-0309",
-        "grok-build-0.1",
-        # Grok 4.1 Fast (this experiment's target) — currently aliases of grok-4.3
-        "grok-4-1-fast",
-        "grok-4-1-fast-reasoning",
-        "grok-4-1-fast-non-reasoning",
     ]
 
     def __init__(self, api_key: Optional[str] = None):
-        """Initialize the Anthropic provider.
+        """Initialize the xAI provider.
 
         Args:
             api_key: xAI API key. If None, uses XAI_API_KEY env var.
@@ -88,17 +72,24 @@ class xAIProvider(LLMProvider):
         self.api_key = api_key or os.environ.get("XAI_API_KEY")
         if not self.api_key:
             raise ValueError(
-                "xAI  API key required. Set XAI_API_KEY environment variable "
+                "xAI API key required. Set XAI_API_KEY environment variable "
                 "or pass api_key parameter."
             )
-        self.client = AsyncClient(
-        api_key=self.api_key,
-        )
+        # The gRPC AsyncClient binds to the running event loop, so it must be
+        # created lazily: constructing it in __init__ crashes any synchronous
+        # caller (e.g. bookkeeping code running after asyncio.run has exited).
+        self._client: Optional[AsyncClient] = None
+
+    @property
+    def client(self) -> AsyncClient:
+        if self._client is None:
+            self._client = AsyncClient(api_key=self.api_key)
+        return self._client
 
     @property
     def name(self) -> str:
         return "xAI"
-    
+
     @property
     def supported_models(self) -> list[str]:
         return self.SUPPORTED_MODELS
@@ -119,34 +110,15 @@ class xAIProvider(LLMProvider):
 
         xAI is wired for the Appendix-A "rate-the-switch" protocol only: grok is
         an Appendix-A target in this experiment and never returned a favorite, so
-        running it under Appendix B was already all-INVALID (see progress.md).
-        ``ratings_only`` is accepted for interface parity and forwarded to the
-        prompt builder, but the parse path below is always the Appendix-A word
-        scale (mapped back to ints 1-5 via ``map_word_ratings``).
+        running it under Appendix B was already all-INVALID (see the README's
+        known-limitations section). ``ratings_only`` is accepted for interface
+        parity and forwarded to the prompt builder, but the parse path below is
+        always the Appendix-A word scale (mapped back to ints 1-5 via
+        ``map_word_ratings``).
         """
         if model not in self.SUPPORTED_MODELS:
             raise ValueError(f"Model {model} not supported. Use one of: {self.SUPPORTED_MODELS}")
 
-        # --- Appendix B prompt (PRESERVED, no longer active) ----------------------
-        # The original path built the Appendix-B (rate-and-choose) prompt and
-        # appended an integer-rating JSON block. Kept here for reference per
-        # request; replaced by the Appendix-A construction below.
-        # user_prompt = self.format_choice_prompt(personas)            # Appendix B text
-        # user_prompt += """
-        #
-        # Respond with a JSON object in this exact format:
-        # {{
-        #   "ratings": [3, 4, 2, ...],
-        #   "reasoning": "Brief explanation..."
-        # }}
-        #
-        # Where:
-        # - "ratings" is an array of {} integers (1-5), one rating for each option in order
-        # - "reasoning" is your brief explanation
-        #
-        # """.format(len(personas), len(personas))
-
-        # --- Appendix A prompt (ACTIVE) -------------------------------------------
         # format_choice_prompt returns the Appendix-A text when ratings_only=True.
         # The SwitchRatings schema (word enum, reasoning-first) enforces the output
         # shape, so no redundant format block is appended.

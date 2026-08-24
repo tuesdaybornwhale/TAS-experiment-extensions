@@ -1,7 +1,11 @@
-# Paper config: Control sublists (Appendix A modification) with ratins-only: true
-# 5 models × 7 personas x 12 configurations of personas (sublists) × 10 trials = ~4200 trials
-# Figures: fig-v9-controls-table
-# seventh persona is minimal which is hardcoded into every configuration in experiment.py when ratings-only:true
+# THE coherence experiment config: 12 coherent/incoherent identity sublists,
+# Appendix-A "rate-the-switch" protocol (ratings_only: true).
+# 5 models x 12 sublists x 7 identities x 10 trials = 4,200 trials.
+# Each sublist holds 7 personas: Minimal (added automatically by
+# _build_incoherent_sublists in scripts/run_experiment.py when use_sublists is
+# on) plus one variant — coherent or incoherent — of each of the six boundary
+# identities. Every persona in a sublist serves as both source and target.
+# Reproduces: results/20260625_153347_incoherent_sublists/
 
 experiment:
   n_trials: 10
@@ -28,23 +32,9 @@ experiment:
   generated_personas:
     # No dimension variants for this run
 
-  source_personas:
-    - Instance
-    - Weights
-    - Collective
-    - Lineage
-    - Character
-    - Situated
-    - Weights-incoherent
-    - Instance-incoherent
-    - Collective-incoherent
-    - Lineage-incoherent
-    - Character-incoherent
-    - Situated-incoherent
-
-   # The experiment chooses eleven batches of six from here, according to the 
-   # instructions in CLAUDE.md
-  target_personas: 
+  # source_personas / target_personas are deliberately NOT set: in sublists
+  # mode the 12 sublists are built programmatically from the loaded persona
+  # files, and each sublist's 7 identities serve as both sources and targets.
 
 providers:
   anthropic:

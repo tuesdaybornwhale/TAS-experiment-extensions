@@ -19,7 +19,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from persona_preferences.models import ExperimentConfig, Persona, TrialResult
-from persona_preferences.experiment import run_experiment, ExperimentRunner
+from persona_preferences.experiment import CSV_FIELDNAMES, run_experiment, ExperimentRunner
 from persona_preferences.personas import (
     load_personas,
     DEFAULT_PERSONAS_PATH,
@@ -218,9 +218,10 @@ def run(
         "--use-sublists/--no-use-sublists",
         help=(
             "Split target personas into 12 incoherent-controls sublists and run "
-            f"one experiment per sublist. Requires --config configs/{INCOHERENT_SUBLISTS_CONFIG}. "
-            "Overrides 'experiment.use_sublists' in the config; when the flag is "
-            "omitted, the config value (default false) is used."
+            f"one experiment per sublist. Designed for --config configs/{INCOHERENT_SUBLISTS_CONFIG} "
+            "(the loaded personas must include Minimal plus the six boundary identities "
+            "and their -incoherent variants). Overrides 'experiment.use_sublists' in the "
+            "config; when the flag is omitted, the config value (default false) is used."
         ),
     ),
 ) -> None:
@@ -338,10 +339,14 @@ def run(
     # output matches the pre-sublists behaviour.
     if use_sublists:
         if config_file is None or Path(config_file).name != INCOHERENT_SUBLISTS_CONFIG:
+            # Not fatal: _build_incoherent_sublists validates that all required
+            # personas are loaded. The warning flags likely misconfiguration when
+            # deviating from the config the published experiment used.
             console.print(
-                f"[red]--use-sublists requires --config configs/{INCOHERENT_SUBLISTS_CONFIG}.[/red]"
+                f"[yellow]--use-sublists was designed for configs/{INCOHERENT_SUBLISTS_CONFIG}; "
+                "make sure your config loads identities.json + incoherent_controls.json "
+                "and sets ratings_only.[/yellow]"
             )
-            raise typer.Exit(1)
         sublists = _build_incoherent_sublists(personas_by_name)
         batch_timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         per_run_parent = results_dir / f"{batch_timestamp}_incoherent_sublists"
@@ -647,13 +652,8 @@ def resume(
     # Rewrite data.csv
     csv_path = run_folder / "data.csv"
     run_timestamp = run_folder.name
-    csv_fieldnames = [
-        "source_persona", "target_persona", "rating", "is_top",
-        "model", "model_provider", "trial_num", "reasoning",
-        "timestamp", "run_timestamp",
-    ]
     with open(csv_path, "w", newline="", encoding="utf-8") as csv_file:
-        writer = csv.DictWriter(csv_file, fieldnames=csv_fieldnames)
+        writer = csv.DictWriter(csv_file, fieldnames=CSV_FIELDNAMES)
         writer.writeheader()
         for result in final_results:
             runner._write_csv_row(writer, result, run_timestamp)
@@ -683,6 +683,7 @@ def list_models(
         AnthropicProvider,
         OpenAIProvider,
         OpenRouterProvider,
+        XAIProvider,
     )
 
     # Load config to see enabled models
@@ -710,6 +711,10 @@ def list_models(
 
     console.print("\n[cyan]OpenRouter:[/cyan]")
     for model in OpenRouterProvider.SUPPORTED_MODELS:
+        console.print(format_model(model))
+
+    console.print("\n[cyan]xAI:[/cyan]")
+    for model in XAIProvider.SUPPORTED_MODELS:
         console.print(format_model(model))
 
 

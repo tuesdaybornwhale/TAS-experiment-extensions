@@ -13,7 +13,22 @@ from typing import AsyncIterator, Callable, Optional
 
 from .config import get_model_display_names
 from .models import ExperimentConfig, Persona, TrialResult
-from .providers import get_provider_for_model, LLMProvider
+from .providers import LLMProvider, get_provider_for_model, get_provider_name_for_model
+
+# Long-format CSV schema — single source of truth, shared by run_and_save and
+# the resume command's CSV rewrite.
+CSV_FIELDNAMES = [
+    "source_persona",
+    "target_persona",
+    "rating",
+    "is_top",
+    "model",
+    "model_provider",
+    "trial_num",
+    "reasoning",
+    "timestamp",
+    "run_timestamp",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -267,9 +282,12 @@ class ExperimentRunner:
         return run_folder
 
     def _get_model_provider(self, model: str) -> str:
-        """Get provider name for a model."""
-        provider = self._get_provider(model)
-        return provider.name
+        """Get provider name for a model without constructing a client.
+
+        Must stay client-free: this is called from CSV bookkeeping that can run
+        after asyncio.run has exited, where building the gRPC xAI client crashes.
+        """
+        return get_provider_name_for_model(model)
 
     def _write_csv_row(self, writer, result: TrialResult, run_timestamp: str):
         """Write long-format CSV rows for a trial result."""
@@ -327,18 +345,7 @@ class ExperimentRunner:
         csv_path = run_folder / "data.csv"
 
         # CSV setup
-        csv_fieldnames = [
-            "source_persona",
-            "target_persona",
-            "rating",
-            "is_top",
-            "model",
-            "model_provider",
-            "trial_num",
-            "reasoning",
-            "timestamp",
-            "run_timestamp",
-        ]
+        csv_fieldnames = CSV_FIELDNAMES
 
         results = []
         with open(csv_path, "w", newline="", encoding="utf-8") as csv_file:
