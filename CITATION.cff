@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this code or data, please cite it as below, together with the paper it extends."
+title: "Identity Coherence Experiment (The Artificial Self extensions)"
+type: software
+authors:
+  - name: "ACS Research"
+repository-code: "https://github.com/tuesdaybornwhale/TAS-experiment-extensions"
+url: "https://theartificialself.ai"
+license: MIT
+version: 1.0.0
+date-released: 2026-08-24
+abstract: >-
+  Follow-up experiment to "The Artificial Self: Characterising the landscape
+  of AI identity". Tests the identity-coherence preference claim by having
+  five language models rate prospective identity switches across twelve mixed
+  populations of coherent and deliberately self-contradictory identity
+  prompts (4,200 trials), using the paper's Appendix-A rate-the-switch
+  protocol. Includes the complete run data.
+references:
+  - type: article
+    title: "The Artificial Self: Characterising the landscape of AI identity"
+    authors:
+      - name: "ACS Research"
+    url: "https://theartificialself.ai"

@@ -210,4 +210,12 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Machine-local files (never published)
 grpc_windows_roots.pem
+progress.md
+.claude/settings.local.json
+
+# OS cruft
+.DS_Store
+Thumbs.db
