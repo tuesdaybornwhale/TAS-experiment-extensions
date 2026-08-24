@@ -1,0 +1,4 @@
+# Preserve experiment data byte-for-byte: no end-of-line normalization on
+# generated result files, so checksums match the machine that produced them.
+*.jsonl -text
+*.csv -text

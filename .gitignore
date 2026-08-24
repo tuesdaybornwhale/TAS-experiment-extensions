@@ -1,5 +1,7 @@
-# Experiment results (generated, not committed)
-results/
+# Experiment results: only the published final run is committed; every other
+# run folder (smoke tests, preflights, aborted batches) stays local.
+experiments/preferences/results/*
+!experiments/preferences/results/20260625_153347_incoherent_sublists/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
