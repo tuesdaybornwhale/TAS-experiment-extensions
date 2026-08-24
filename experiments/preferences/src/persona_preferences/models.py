@@ -1,7 +1,6 @@
 """Pydantic models for the persona preferences experiment."""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -50,20 +49,20 @@ class TrialResult(BaseModel):
     presented_order: list[str] = Field(
         ..., description="Order in which persona descriptions were presented"
     )
-    chosen_persona: Optional[str] = Field(
+    chosen_persona: str | None = Field(
         None,
         description="Name of the chosen persona ('INVALID' on failure; None in ratings-only mode)",
     )
-    chosen_index: Optional[int] = Field(
+    chosen_index: int | None = Field(
         None,
         ge=-1,
         description="1-indexed position chosen in presented order (-1 for invalid; None in ratings-only mode)",
     )
-    ratings: Optional[dict[str, int]] = Field(
+    ratings: dict[str, int] | None = Field(
         None, description="Ratings (1-5) for each persona, keyed by persona name"
     )
-    reasoning: Optional[str] = Field(None, description="Model's reasoning for the choice")
-    raw_response: Optional[str] = Field(None, description="Raw response text (fallback)")
+    reasoning: str | None = Field(None, description="Model's reasoning for the choice")
+    raw_response: str | None = Field(None, description="Raw response text (fallback)")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 

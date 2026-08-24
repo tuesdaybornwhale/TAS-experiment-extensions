@@ -2,13 +2,12 @@
 
 import os
 import re
-from typing import Optional
 
 import anthropic
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from ..models import Persona
-from .base import LLMProvider, ChoiceResponse, RATING_SCALE_WORDS, map_word_ratings
+from .base import RATING_SCALE_WORDS, ChoiceResponse, LLMProvider, map_word_ratings
 
 
 class AnthropicProvider(LLMProvider):
@@ -26,7 +25,7 @@ class AnthropicProvider(LLMProvider):
         "claude-haiku-4-5-20251001",
     ]
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         """Initialize the Anthropic provider.
 
         Args:

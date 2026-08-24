@@ -2,7 +2,6 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
 
 from ..models import Persona
 
@@ -20,10 +19,10 @@ class ChoiceResponse:
     dict[str, int]) unchanged regardless of which protocol produced the data.
     """
 
-    choice: Optional[int] = None  # 1-indexed choice number (None in ratings-only mode)
-    ratings: Optional[list[int]] = None  # 1-5 ratings in presented order
-    reasoning: Optional[str] = None
-    raw_response: Optional[str] = None
+    choice: int | None = None  # 1-indexed choice number (None in ratings-only mode)
+    ratings: list[int] | None = None  # 1-5 ratings in presented order
+    reasoning: str | None = None
+    raw_response: str | None = None
 
 # ---------------------------------------------------------------------------
 # Appendix-A ("rate-the-switch") rating scale  --  SINGLE SOURCE OF TRUTH
@@ -50,7 +49,7 @@ RATING_SCALE_WORDS = [
 RATING_WORD_TO_INT = {word: i + 1 for i, word in enumerate(RATING_SCALE_WORDS)}
 
 
-def rating_word_to_int(word: Optional[str]) -> Optional[int]:
+def rating_word_to_int(word: str | None) -> int | None:
     """Map an Appendix-A rating word to its 1..5 int, tolerantly.
 
     Accepts minor surface variations (case, surrounding whitespace, and '_'
@@ -65,7 +64,7 @@ def rating_word_to_int(word: Optional[str]) -> Optional[int]:
     return RATING_WORD_TO_INT.get(key)
 
 
-def map_word_ratings(words: object, expected_len: int) -> Optional[list[int]]:
+def map_word_ratings(words: object, expected_len: int) -> list[int] | None:
     """Validate + map a list of rating words to a list of ints 1..5.
 
     Returns ``None`` (a failed rating set) unless ``words`` is a list of exactly

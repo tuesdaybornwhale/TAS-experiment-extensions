@@ -1,0 +1,3 @@
+# Deduplicate author identities and strip the raw HOSTNAME\username string
+# that leaked into some commits.
+Ondrej Havlicek <31344071+ondrejhavlicek@users.noreply.github.com> T480\OndrejHavlicek <ondrej.havlicek@datasentics.com>

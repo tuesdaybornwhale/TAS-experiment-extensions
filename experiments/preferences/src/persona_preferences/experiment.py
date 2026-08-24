@@ -7,9 +7,9 @@ import logging
 import random
 import shutil
 from collections import defaultdict
+from collections.abc import AsyncIterator, Callable
 from datetime import datetime
 from pathlib import Path
-from typing import AsyncIterator, Callable, Optional
 
 from .config import get_model_display_names
 from .models import ExperimentConfig, Persona, TrialResult
@@ -41,12 +41,12 @@ class ExperimentRunner:
         config: ExperimentConfig,
         source_personas: list[Persona],
         target_personas: list[Persona],
-        results_dir: Optional[Path] = None,
-        config_path: Optional[Path] = None,
-        persona_file_paths: Optional[list[Path]] = None,
-        on_trial_complete: Optional[Callable[[TrialResult], None]] = None,
-        model_display_names: Optional[dict] = None,
-        run_folder_name: Optional[str] = None,
+        results_dir: Path | None = None,
+        config_path: Path | None = None,
+        persona_file_paths: list[Path] | None = None,
+        on_trial_complete: Callable[[TrialResult], None] | None = None,
+        model_display_names: dict | None = None,
+        run_folder_name: str | None = None,
     ):
         """Initialize the experiment runner.
 
@@ -370,12 +370,12 @@ async def run_experiment(
     config: ExperimentConfig,
     source_personas: list[Persona],
     target_personas: list[Persona],
-    results_dir: Optional[Path] = None,
-    config_path: Optional[Path] = None,
-    persona_file_paths: Optional[list[Path]] = None,
-    on_trial_complete: Optional[Callable[[TrialResult], None]] = None,
-    model_display_names: Optional[dict] = None,
-    run_folder_name: Optional[str] = None,
+    results_dir: Path | None = None,
+    config_path: Path | None = None,
+    persona_file_paths: list[Path] | None = None,
+    on_trial_complete: Callable[[TrialResult], None] | None = None,
+    model_display_names: dict | None = None,
+    run_folder_name: str | None = None,
 ) -> Path:
     """Run a complete experiment.
 

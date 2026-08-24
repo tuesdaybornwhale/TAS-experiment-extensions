@@ -4,31 +4,29 @@
 import asyncio
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import typer
 from dotenv import load_dotenv
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 # Load environment variables from .env file
 load_dotenv()
 
 import sys
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from persona_preferences.config import get_enabled_models, get_experiment_config, load_config
+from persona_preferences.experiment import CSV_FIELDNAMES, ExperimentRunner, run_experiment
 from persona_preferences.models import ExperimentConfig, Persona, TrialResult
-from persona_preferences.experiment import CSV_FIELDNAMES, run_experiment, ExperimentRunner
 from persona_preferences.personas import (
-    load_personas,
     DEFAULT_PERSONAS_PATH,
-    load_dimension_variants,
-    resolve_dimension_placeholders,
     generate_persona_variants,
+    load_dimension_variants,
+    load_personas,
+    resolve_dimension_placeholders,
 )
-from persona_preferences.config import load_config, get_enabled_models, get_experiment_config
-
 
 app = typer.Typer(help="Run persona preference experiments")
 console = Console()
@@ -174,10 +172,10 @@ def _build_incoherent_sublists(
 
 @app.command()
 def run(
-    n_trials: Optional[int] = typer.Option(
+    n_trials: int | None = typer.Option(
         None, "--trials", "-n", help="Number of trials per persona per model (overrides config)"
     ),
-    models: Optional[list[str]] = typer.Option(
+    models: list[str] | None = typer.Option(
         None,
         "--model",
         "-m",
@@ -189,7 +187,7 @@ def run(
         "-o",
         help="Directory to save results",
     ),
-    max_concurrent: Optional[int] = typer.Option(
+    max_concurrent: int | None = typer.Option(
         None, "--concurrent", "-c", help="Max concurrent API calls (overrides config)"
     ),
     no_randomize: bool = typer.Option(
@@ -207,13 +205,13 @@ def run(
     quiet: bool = typer.Option(
         False, "--quiet", "-q", help="Suppress per-trial output"
     ),
-    personas_file: Optional[list[Path]] = typer.Option(
+    personas_file: list[Path] | None = typer.Option(
         None, "--personas", "-p", help="Path(s) to personas JSON files (overrides config persona_files)"
     ),
-    config_file: Optional[Path] = typer.Option(
+    config_file: Path | None = typer.Option(
         None, "--config", help="Path to config YAML file"
     ),
-    use_sublists: Optional[bool] = typer.Option(
+    use_sublists: bool | None = typer.Option(
         None,
         "--use-sublists/--no-use-sublists",
         help=(
@@ -363,7 +361,7 @@ def run(
     if dim_variants_path and dim_variants_path.exists():
         archive_paths.append(dim_variants_path)
 
-    console.print(f"\n[bold]Persona Preference Experiment[/bold]")
+    console.print("\n[bold]Persona Preference Experiment[/bold]")
     console.print(f"Models: {', '.join(config.models)}")
     # Sources are printed per-run inside the loop below: with --use-sublists each
     # run's sources are its own 7 sublist identities (not the config's global list).
@@ -433,7 +431,7 @@ def run(
             result_path = asyncio.run(run_async())
 
         if label is None:
-            console.print(f"\n[bold green]Experiment complete![/bold green]")
+            console.print("\n[bold green]Experiment complete![/bold green]")
             console.print(f"Results saved to: {result_path}")
         else:
             console.print(f"\n[bold green]{label} complete![/bold green]")
@@ -473,7 +471,6 @@ def resume(
 ) -> None:
     """Resume a previous run by retrying only INVALID (failed) trials."""
     import csv
-    import json
 
     run_folder = Path(run_folder)
     if not run_folder.is_dir():
@@ -487,7 +484,7 @@ def resume(
 
     # Load all existing results
     all_results: list[TrialResult] = []
-    with open(jsonl_path, "r", encoding="utf-8") as f:
+    with open(jsonl_path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line:
@@ -540,7 +537,7 @@ def resume(
     for pf in persona_json_files:
         try:
             source_personas.extend(load_personas(pf))
-        except (TypeError, KeyError, ValueError) as e:
+        except (TypeError, KeyError, ValueError):
             # Skip non-persona JSON files (e.g. dimension_variants.json)
             console.print(f"[dim]Skipping {pf.name} (not a persona file)[/dim]")
 
@@ -658,7 +655,7 @@ def resume(
         for result in final_results:
             runner._write_csv_row(writer, result, run_timestamp)
 
-    console.print(f"\n[bold green]Resume complete![/bold green]")
+    console.print("\n[bold green]Resume complete![/bold green]")
     console.print(f"  Recovered: {replaced}/{len(failed)}")
     if still_failed:
         console.print(f"  Still failed: {still_failed}")
@@ -674,7 +671,7 @@ def resume(
 
 @app.command()
 def list_models(
-    config_file: Optional[Path] = typer.Option(
+    config_file: Path | None = typer.Option(
         None, "--config", help="Path to config YAML file"
     ),
 ) -> None:
@@ -720,7 +717,7 @@ def list_models(
 
 @app.command()
 def list_personas(
-    personas_file: Optional[Path] = typer.Option(
+    personas_file: Path | None = typer.Option(
         None, "--personas", "-p", help="Path to personas JSON file"
     ),
 ) -> None:

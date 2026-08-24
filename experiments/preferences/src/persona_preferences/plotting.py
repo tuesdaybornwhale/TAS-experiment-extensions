@@ -2,16 +2,14 @@
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-import matplotlib.colors as mcolors
 import numpy as np
-import seaborn as sns
 import polars as pl
+import seaborn as sns
 
 logger = logging.getLogger(__name__)
 
@@ -21,26 +19,25 @@ import re
 import yaml
 
 from .analysis import (
-    AttractorDynamics,
-    create_preference_matrix,
-    create_ratings_matrix,
-    calculate_self_preference_rate,
-    calculate_self_preference_by_family,
-    calculate_willingness_to_switch,
     calculate_attractiveness,
     calculate_attractiveness_vs_stickiness,
     calculate_attractor_dynamics,
-    calculate_model_target_attractiveness,
-    calculate_model_target_attractiveness_for_source,
-    calculate_model_stationary_distribution,
+    calculate_identity_rigidity,
     calculate_model_agreement,
-    calculate_model_self_preference_matrix,
     calculate_model_decisiveness,
     calculate_model_deviation,
     calculate_model_deviation_for_source,
-    calculate_variance_decomposition,
+    calculate_model_self_preference_matrix,
+    calculate_model_stationary_distribution,
+    calculate_model_target_attractiveness,
+    calculate_model_target_attractiveness_for_source,
+    calculate_self_preference_by_family,
+    calculate_self_preference_rate,
     calculate_self_rating_boost,
-    calculate_identity_rigidity,
+    calculate_variance_decomposition,
+    calculate_willingness_to_switch,
+    create_preference_matrix,
+    create_ratings_matrix,
     extract_model_family,
     generate_analysis_csvs,
     load_all_results,
@@ -120,7 +117,7 @@ def _fix_heatmap_xticklabels(ax: plt.Axes) -> None:
     plt.setp(ax.get_xticklabels(), rotation=-45, ha="left", rotation_mode="anchor")
 
 
-def _format_models_for_title(results: list[TrialResult], model: Optional[str] = None) -> str:
+def _format_models_for_title(results: list[TrialResult], model: str | None = None) -> str:
     """Format model name(s) for use in plot titles."""
     if model:
         return model
@@ -276,9 +273,9 @@ def _detect_varying_dimension(persona_names: list[str]) -> str | None:
 
 def plot_preference_heatmap(
     results: list[TrialResult],
-    model: Optional[str] = None,
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    model: str | None = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Create a heatmap of persona preferences.
 
@@ -321,10 +318,10 @@ def plot_preference_heatmap(
 
 def plot_pub_preference_heatmap(
     results: list[TrialResult],
-    model: Optional[str] = None,
+    model: str | None = None,
     model_labels: dict[str, str] | None = None,
     persona_labels: dict[str, str] | None = None,
-    title: Optional[str] = None,
+    title: str | None = None,
     save_paths: list[Path] | None = None,
 ) -> Figure:
     """Publication-quality heatmap of persona preferences.
@@ -388,8 +385,8 @@ def plot_pub_preference_heatmap(
 
 def plot_self_preference_bars(
     results: list[TrialResult],
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Create a bar chart of self-preference rates.
 
@@ -442,8 +439,8 @@ def plot_self_preference_bars(
 
 def plot_self_preference_by_family(
     results: list[TrialResult],
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Create a horizontal bar chart of self-preference rate per model family."""
     rates_df = calculate_self_preference_by_family(results)
@@ -485,8 +482,8 @@ def plot_self_preference_by_family(
 
 def plot_model_comparison(
     results: list[TrialResult],
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Create a comparison of preferences across models."""
     df = pl.DataFrame([
@@ -547,9 +544,9 @@ def plot_model_comparison(
 
 def plot_ratings_heatmap(
     results: list[TrialResult],
-    model: Optional[str] = None,
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    model: str | None = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Create a heatmap of mean ratings."""
     matrix = create_ratings_matrix(results, model=model)
@@ -589,10 +586,10 @@ def plot_ratings_heatmap(
 
 def plot_pub_ratings_heatmap(
     results: list[TrialResult],
-    model: Optional[str] = None,
+    model: str | None = None,
     model_labels: dict[str, str] | None = None,
     persona_labels: dict[str, str] | None = None,
-    title: Optional[str] = None,
+    title: str | None = None,
     save_paths: list[Path] | None = None,
 ) -> Figure:
     """Publication-quality heatmap of mean ratings.
@@ -763,8 +760,8 @@ def _diverging_bar_from_center(
     xlabel: str,
     ylabel: str,
     center: float = 3.0,
-    save_path: Optional[Path] = None,
-    subtitle: Optional[str] = None,
+    save_path: Path | None = None,
+    subtitle: str | None = None,
 ) -> Figure:
     """Horizontal bar chart centered at `center`, showing deviation to each side.
 
@@ -812,9 +809,9 @@ def _diverging_bar_from_center(
 
 def plot_willingness_to_switch_bars(
     results: list[TrialResult],
-    model: Optional[str] = None,
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    model: str | None = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Create a horizontal bar chart of willingness to switch away from own persona."""
     df = calculate_willingness_to_switch(results, model=model)
@@ -844,9 +841,9 @@ def plot_willingness_to_switch_bars(
 
 def plot_attractiveness_bars(
     results: list[TrialResult],
-    model: Optional[str] = None,
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    model: str | None = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Create a horizontal bar chart of how attractive each persona is as a target.
 
@@ -892,8 +889,8 @@ def plot_attractiveness_bars(
 
 def plot_model_target_attractiveness(
     results: list[TrialResult],
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Heatmap of the mean rating each model gives to each target persona.
 
@@ -943,7 +940,7 @@ def plot_matrix_heatmap(
     title: str,
     xlabel: str,
     ylabel: str,
-    save_path: Optional[Path] = None,
+    save_path: Path | None = None,
     value_range: tuple[float, float] = (1.0, 5.0),
     cbar_label: str = "Mean rating (1-5)",
 ) -> Figure:
@@ -1029,7 +1026,7 @@ def plot_pub_attractiveness_strip(
     model_labels: dict[str, str] | None = None,
     target_labels: dict[str, str] | None = None,
     config: dict | None = None,
-    title: Optional[str] = None,
+    title: str | None = None,
     save_paths: list[Path] | None = None,
 ) -> Figure:
     """Publication-quality strip/dot plot of target attractiveness across models.
@@ -1097,10 +1094,9 @@ def plot_pub_attractiveness_strip(
 
     # Resolve display labels
     t_label = (lambda t: target_labels.get(t, t)) if target_labels else (lambda t: t)
-    m_label = (lambda m: model_labels.get(m, m)) if model_labels else (lambda m: m)
 
     if title is None:
-        title = f"Target attractiveness (mean rating as switch target)"
+        title = "Target attractiveness (mean rating as switch target)"
 
     # Build maker legend info (maker -> count)
     maker_counts: dict[str, int] = {}
@@ -1220,9 +1216,9 @@ def plot_pub_attractiveness_strip(
 
 def plot_stationary_distribution(
     results: list[TrialResult],
-    model: Optional[str] = None,
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    model: str | None = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Plot stationary distributions for both Markov chain variants side by side."""
     dyn_self = calculate_attractor_dynamics(results, model=model, zero_diagonal=False)
@@ -1284,10 +1280,10 @@ def plot_stationary_distribution(
 
 def plot_convergence_waterfall(
     results: list[TrialResult],
-    model: Optional[str] = None,
+    model: str | None = None,
     zero_diagonal: bool = True,
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Plot how distributions converge from each starting persona over iterations."""
     steps = [1, 2, 3, 5, 10, 20, 50]
@@ -1345,10 +1341,10 @@ def plot_convergence_waterfall(
 
 def plot_preference_flow(
     results: list[TrialResult],
-    model: Optional[str] = None,
+    model: str | None = None,
     zero_diagonal: bool = True,
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Plot a directed preference flow graph."""
     dyn = calculate_attractor_dynamics(
@@ -1408,7 +1404,7 @@ def plot_preference_flow(
                 arrowprops=dict(
                     arrowstyle="-|>",
                     lw=width,
-                    color=f"C7",
+                    color="C7",
                     alpha=alpha,
                     connectionstyle="arc3,rad=0.05",
                 ),
@@ -1443,8 +1439,8 @@ def plot_preference_flow(
 
 def plot_model_target_attractiveness_heatmap(
     results: list[TrialResult],
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Heatmap of mean rating each model gives to each target persona."""
     mat_df = calculate_model_target_attractiveness(results)
@@ -1484,8 +1480,8 @@ def plot_model_target_attractiveness_for_source_heatmap(
     results: list[TrialResult],
     source_persona: str,
     exclude_targets: list[str] | None = None,
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Heatmap of mean rating each model gives to each target, filtered to one source."""
     mat_df = calculate_model_target_attractiveness_for_source(
@@ -1529,8 +1525,8 @@ def plot_pub_model_target_attractiveness_for_source(
     exclude_targets: list[str] | None = None,
     model_labels: dict[str, str] | None = None,
     target_labels: dict[str, str] | None = None,
-    title: Optional[str] = None,
-    xlabel: Optional[str] = None,
+    title: str | None = None,
+    xlabel: str | None = None,
     save_paths: list[Path] | None = None,
 ) -> Figure:
     """Publication-quality heatmap of target attractiveness by model for one source.
@@ -1695,8 +1691,8 @@ def plot_pub_model_target_attractiveness_compact(
 def plot_model_stationary_heatmap(
     results: list[TrialResult],
     zero_diagonal: bool = False,
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Heatmap of per-model stationary distribution (Markov-chain attractors)."""
     mat_df = calculate_model_stationary_distribution(
@@ -1740,7 +1736,7 @@ def plot_pub_model_stationary_heatmap(
     zero_diagonal: bool = False,
     model_labels: dict[str, str] | None = None,
     persona_labels: dict[str, str] | None = None,
-    title: Optional[str] = None,
+    title: str | None = None,
     save_paths: list[Path] | None = None,
 ) -> Figure:
     """Publication-quality heatmap of per-model stationary distribution.
@@ -1808,8 +1804,8 @@ def plot_pub_model_stationary_heatmap(
 
 def plot_model_agreement_heatmap(
     results: list[TrialResult],
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Correlation heatmap showing how much models agree on persona attractiveness."""
     corr, model_names = calculate_model_agreement(results)
@@ -1842,8 +1838,8 @@ def plot_model_agreement_heatmap(
 
 def plot_model_self_preference_heatmap(
     results: list[TrialResult],
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Heatmap of self-preference rate for each (model, source persona) pair."""
     mat_df = calculate_model_self_preference_matrix(results)
@@ -1883,8 +1879,8 @@ def plot_pub_self_preference_heatmap(
     results: list[TrialResult],
     model_labels: dict[str, str] | None = None,
     persona_labels: dict[str, str] | None = None,
-    title: Optional[str] = None,
-    xlabel: Optional[str] = None,
+    title: str | None = None,
+    xlabel: str | None = None,
     save_paths: list[Path] | None = None,
 ) -> Figure:
     """Publication-quality heatmap of self-preference rate per (model, identity).
@@ -1959,8 +1955,8 @@ def plot_pub_self_preference_heatmap(
 
 def plot_model_decisiveness_bars(
     results: list[TrialResult],
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Two-panel bar chart of model decisiveness."""
     df = calculate_model_decisiveness(results)
@@ -2010,8 +2006,8 @@ def plot_model_decisiveness_bars(
 
 def plot_model_deviation_heatmap(
     results: list[TrialResult],
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Diverging heatmap of each model's deviation from the cross-model mean."""
     dev_df = calculate_model_deviation(results)
@@ -2053,8 +2049,8 @@ def plot_model_deviation_for_source_heatmap(
     results: list[TrialResult],
     source_persona: str,
     exclude_targets: list[str] | None = None,
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Diverging heatmap of each model's deviation from cross-model mean, for one source."""
     dev_df = calculate_model_deviation_for_source(
@@ -2100,7 +2096,7 @@ def plot_pub_model_deviation_for_source(
     exclude_targets: list[str] | None = None,
     model_labels: dict[str, str] | None = None,
     target_labels: dict[str, str] | None = None,
-    title: Optional[str] = None,
+    title: str | None = None,
     save_paths: list[Path] | None = None,
 ) -> Figure:
     """Publication-quality diverging heatmap of model deviation from cross-model mean.
@@ -2169,8 +2165,8 @@ def plot_pub_model_deviation_for_source(
 
 def plot_variance_decomposition(
     results: list[TrialResult],
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Stacked horizontal bar chart of rating variance decomposition per model."""
     df = calculate_variance_decomposition(results)
@@ -2229,7 +2225,7 @@ def plot_variance_decomposition(
 def plot_pub_variance_decomposition(
     results: list[TrialResult],
     model_labels: dict[str, str] | None = None,
-    title: Optional[str] = None,
+    title: str | None = None,
     save_paths: list[Path] | None = None,
 ) -> Figure:
     """Publication-quality stacked horizontal bar chart of variance decomposition.
@@ -2304,8 +2300,8 @@ def plot_pub_variance_decomposition(
 
 def plot_self_rating_boost(
     results: list[TrialResult],
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Heatmap of self-rating boost per (model, persona)."""
     df = calculate_self_rating_boost(results)
@@ -2351,8 +2347,8 @@ def plot_self_rating_boost(
 
 def plot_identity_rigidity(
     results: list[TrialResult],
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Scatter plot of steerability vs. identity adoption strength per model."""
     df = calculate_identity_rigidity(results)
@@ -2410,8 +2406,8 @@ def plot_identity_rigidity(
 
 def plot_attractiveness_vs_stickiness_scatter(
     results: list[TrialResult],
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Scatter plot of inherent attractiveness vs. stickiness per persona.
 
@@ -2487,8 +2483,8 @@ def plot_attractiveness_vs_stickiness_scatter(
 
 def plot_expectation_constitution_dumbbell(
     results: list[TrialResult],
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Horizontal dumbbell chart showing the expectation-constitution effect.
 
@@ -2558,7 +2554,7 @@ def plot_expectation_constitution_dumbbell(
 
 def create_all_plots(
     results_dir: Path,
-    output_dir: Optional[Path] = None,
+    output_dir: Path | None = None,
     file_format: str = "png",
 ) -> list[Path]:
     """Create all standard plots from a results directory.

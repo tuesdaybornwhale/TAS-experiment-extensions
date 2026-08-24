@@ -1,7 +1,6 @@
 """Configuration loader for experiment settings."""
 
 from pathlib import Path
-from typing import Optional
 
 import yaml
 
@@ -49,7 +48,7 @@ def get_enabled_models(config: dict) -> list[str]:
     return models
 
 
-def get_experiment_config(config: dict, override_models: Optional[list[str]] = None) -> ExperimentConfig:
+def get_experiment_config(config: dict, override_models: list[str] | None = None) -> ExperimentConfig:
     """Create ExperimentConfig from config dictionary.
 
     Args:

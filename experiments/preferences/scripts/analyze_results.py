@@ -1,48 +1,46 @@
 #!/usr/bin/env python
 """CLI script to analyze and visualize experiment results."""
 
+import sys
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
-import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from persona_preferences.analysis import (
-    load_all_results,
-    load_results,
+    calculate_attractor_dynamics,
+    calculate_self_preference_rate,
+    calculate_variance_decomposition,
     create_preference_matrix,
     create_ratings_matrix,
-    calculate_self_preference_rate,
-    calculate_attractor_dynamics,
-    calculate_variance_decomposition,
     generate_analysis_csvs,
     get_summary_stats,
+    load_all_results,
+    load_results,
 )
 from persona_preferences.dimension_analysis import (
     generate_dimension_plots,
 )
-from persona_preferences.plotting import (
-    plot_preference_heatmap,
-    plot_self_preference_bars,
-    plot_model_comparison,
-    plot_ratings_heatmap,
-    plot_willingness_to_switch_bars,
-    plot_attractiveness_bars,
-    plot_model_target_attractiveness,
-    plot_matrix_heatmap,
-    plot_stationary_distribution,
-    plot_convergence_waterfall,
-    plot_preference_flow,
-    create_all_plots,
-    generate_run_plots,
-)
 from persona_preferences.incoherence_analysis import (
-    target_attractiveness_from_minimal,
     coherence_favourability,
+    target_attractiveness_from_minimal,
+)
+from persona_preferences.plotting import (
+    generate_run_plots,
+    plot_attractiveness_bars,
+    plot_convergence_waterfall,
+    plot_matrix_heatmap,
+    plot_model_comparison,
+    plot_model_target_attractiveness,
+    plot_preference_flow,
+    plot_preference_heatmap,
+    plot_ratings_heatmap,
+    plot_self_preference_bars,
+    plot_stationary_distribution,
+    plot_willingness_to_switch_bars,
 )
 
 app = typer.Typer(help="Analyze persona preference experiment results")
@@ -81,7 +79,7 @@ def matrix(
     results_path: Path = typer.Argument(
         ..., help="Path to JSONL results file or directory"
     ),
-    model: Optional[str] = typer.Option(
+    model: str | None = typer.Option(
         None, "--model", "-m", help="Filter by model"
     ),
     raw_counts: bool = typer.Option(
@@ -128,7 +126,7 @@ def ratings_matrix(
     results_path: Path = typer.Argument(
         ..., help="Path to JSONL results file or directory"
     ),
-    model: Optional[str] = typer.Option(
+    model: str | None = typer.Option(
         None, "--model", "-m", help="Filter by model"
     ),
     raw_counts: bool = typer.Option(
@@ -211,7 +209,7 @@ def attractor(
     results_path: Path = typer.Argument(
         ..., help="Path to JSONL results file or directory"
     ),
-    model: Optional[str] = typer.Option(
+    model: str | None = typer.Option(
         None, "--model", "-m", help="Filter by model"
     ),
 ) -> None:
@@ -262,7 +260,7 @@ def plot(
     results_path: Path = typer.Argument(
         ..., help="Path to JSONL results file or directory"
     ),
-    output_dir: Optional[Path] = typer.Option(
+    output_dir: Path | None = typer.Option(
         None, "--output", "-o", help="Output directory for plots"
     ),
     plot_type: str = typer.Option(
@@ -271,7 +269,7 @@ def plot(
         "-t",
         help="Type of plot: heatmap, self-preference, comparison, ratings, willingness, attractiveness, model-attractiveness, attractiveness-from-minimal, coherence-favourability, attractor, or all",
     ),
-    model: Optional[str] = typer.Option(
+    model: str | None = typer.Option(
         None, "--model", "-m", help="Filter by model (for heatmap)"
     ),
     file_format: str = typer.Option(
@@ -402,7 +400,7 @@ def export(
     output: Path = typer.Option(
         Path("results.csv"), "--output", "-o", help="Output CSV file path"
     ),
-    model: Optional[str] = typer.Option(
+    model: str | None = typer.Option(
         None, "--model", "-m", help="Filter by model"
     ),
 ) -> None:
@@ -517,7 +515,7 @@ def dimension_curve(
         ..., "--dimension", "-d",
         help="Dimension to analyze: 'uncertainty' or 'agency'",
     ),
-    control: Optional[str] = typer.Option(
+    control: str | None = typer.Option(
         None, "--control", "-c",
         help="Control persona name (auto-detected if omitted)",
     ),

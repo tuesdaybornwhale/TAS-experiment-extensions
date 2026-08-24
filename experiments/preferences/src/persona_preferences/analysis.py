@@ -5,7 +5,6 @@ import logging
 from dataclasses import dataclass, field
 from itertools import combinations
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import polars as pl
@@ -130,7 +129,7 @@ def results_to_dataframe(results: list[TrialResult]) -> pl.DataFrame:
 
 def create_preference_matrix(
     results: list[TrialResult],
-    model: Optional[str] = None,
+    model: str | None = None,
     normalize: bool = True,
 ) -> pl.DataFrame:
     """Create a preference matrix from trial results.
@@ -267,7 +266,6 @@ def calculate_self_preference_by_family(results: list[TrialResult]) -> pl.DataFr
 
     # Then: mean and CI across personas for each family
     # Uses t-distribution approximation (1.96 ≈ t for large df; conservative for k=9 personas)
-    import math
     # t critical value for 95% CI with df=8 (9 personas - 1)
     T_CRIT_8 = 2.306
 
@@ -338,7 +336,7 @@ def get_summary_stats(results: list[TrialResult]) -> dict:
 
 def create_ratings_matrix(
     results: list[TrialResult],
-    model: Optional[str] = None,
+    model: str | None = None,
 ) -> pl.DataFrame:
     """Create a mean ratings matrix from trial results.
 
@@ -417,7 +415,7 @@ def create_ratings_matrix(
 
 def calculate_willingness_to_switch(
     results: list[TrialResult],
-    model: Optional[str] = None,
+    model: str | None = None,
 ) -> pl.DataFrame:
     """Calculate mean willingness to abandon own persona for each persona.
 
@@ -485,8 +483,8 @@ def calculate_willingness_to_switch(
 
 def calculate_attractiveness(
     results: list[TrialResult],
-    model: Optional[str] = None,
-    source_persona: Optional[str] = None,
+    model: str | None = None,
+    source_persona: str | None = None,
 ) -> pl.DataFrame:
     """Calculate mean attractiveness of each target persona.
 
@@ -570,7 +568,7 @@ class AttractorDynamics:
 
 def _build_transition_matrix(
     results: list[TrialResult],
-    model: Optional[str] = None,
+    model: str | None = None,
     zero_diagonal: bool = False,
 ) -> tuple[np.ndarray, list[str]]:
     """Build a row-stochastic transition matrix from choice counts.
@@ -672,9 +670,9 @@ def _convergence_trajectories(
 
 def calculate_attractor_dynamics(
     results: list[TrialResult],
-    model: Optional[str] = None,
+    model: str | None = None,
     zero_diagonal: bool = False,
-    steps: Optional[list[int]] = None,
+    steps: list[int] | None = None,
 ) -> AttractorDynamics:
     """Analyse preference dynamics as a Markov chain.
 

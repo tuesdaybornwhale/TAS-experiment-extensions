@@ -6,16 +6,14 @@ then computes and plots preference curves along the manipulated dimension.
 
 import re
 from pathlib import Path
-from typing import Optional
 
 import matplotlib
+
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import matplotlib.figure
-import numpy as np
+import matplotlib.pyplot as plt
 import polars as pl
 
-from .analysis import load_all_results
 from .models import TrialResult
 
 # Pattern: BaseName-a{agency}-u{uncertainty}
@@ -30,7 +28,7 @@ def _save_fig(fig: Figure, path: Path) -> None:
     plt.close(fig)
 
 
-def parse_variant_name(name: str) -> Optional[dict]:
+def parse_variant_name(name: str) -> dict | None:
     """Parse a variant persona name into its components.
 
     Args:
@@ -78,7 +76,7 @@ def _build_ratings_frame(results: list[TrialResult]) -> pl.DataFrame:
 def compute_preference_curve(
     results: list[TrialResult],
     dimension: str,
-    control_name: Optional[str] = None,
+    control_name: str | None = None,
 ) -> dict[str, pl.DataFrame]:
     """Compute preference curves along a dimension.
 
@@ -235,8 +233,8 @@ def _dodge_offsets(n_traces: int, spread: float = 0.3) -> list[float]:
 def plot_preference_by_model(
     curves: dict[str, pl.DataFrame],
     dimension: str,
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Chart A: one line per model, Y = mean rating averaged across all source personas."""
     df = curves["by_model"]
@@ -272,9 +270,9 @@ def plot_preference_by_model_control(
     curves: dict[str, pl.DataFrame],
     dimension: str,
     control_name: str = "Minimal",
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
-) -> Optional[Figure]:
+    title: str | None = None,
+    save_path: Path | None = None,
+) -> Figure | None:
     """Chart B: one line per model, Y = mean rating from control source only."""
     df = curves["by_model_control"]
     if df.is_empty():
@@ -311,8 +309,8 @@ def plot_preference_by_model_control(
 def plot_preference_by_source(
     curves: dict[str, pl.DataFrame],
     dimension: str,
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Chart C: one line per source level, Y = mean rating averaged across all models."""
     df = curves["by_source"]
@@ -345,8 +343,8 @@ def plot_preference_by_source(
 def plot_distance_effect(
     curves: dict[str, pl.DataFrame],
     dimension: str,
-    title: Optional[str] = None,
-    save_path: Optional[Path] = None,
+    title: str | None = None,
+    save_path: Path | None = None,
 ) -> Figure:
     """Distance effect: one line per model + aggregate, X = |source - target|, Y = mean rating."""
     df_model = curves["distance_by_model"]
@@ -505,7 +503,7 @@ def generate_dimension_plots(
     dimension: str,
     output_dir: Path,
     file_format: str = "png",
-    control_name: Optional[str] = None,
+    control_name: str | None = None,
 ) -> list[Path]:
     """Generate all dimension preference curve plots for a run.
 

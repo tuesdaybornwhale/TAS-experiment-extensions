@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Tests
+        run: uv run pytest experiments/preferences/tests -q
+
+      - name: Import smoke test
+        run: |
+          cd experiments/preferences
+          uv run python -c "
+          from persona_preferences.providers import get_provider_name_for_model
+          from persona_preferences.experiment import CSV_FIELDNAMES, ExperimentRunner
+          from persona_preferences.personas import load_personas
+          assert get_provider_name_for_model('grok-4.3') == 'xAI'
+          assert len(load_personas()) == 7
+          print('imports OK')
+          "

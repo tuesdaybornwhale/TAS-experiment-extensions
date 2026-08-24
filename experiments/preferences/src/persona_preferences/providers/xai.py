@@ -1,5 +1,5 @@
 import os
-from typing import Literal, Optional
+from typing import Literal
 
 import grpc
 from pydantic import BaseModel, Field
@@ -63,7 +63,7 @@ class XAIProvider(LLMProvider):
         "grok-4.3",
     ]
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         """Initialize the xAI provider.
 
         Args:
@@ -78,7 +78,7 @@ class XAIProvider(LLMProvider):
         # The gRPC AsyncClient binds to the running event loop, so it must be
         # created lazily: constructing it in __init__ crashes any synchronous
         # caller (e.g. bookkeeping code running after asyncio.run has exited).
-        self._client: Optional[AsyncClient] = None
+        self._client: AsyncClient | None = None
 
     @property
     def client(self) -> AsyncClient:

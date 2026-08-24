@@ -214,8 +214,8 @@ def per_model_interaction(df: pl.DataFrame) -> pl.DataFrame:
 
 def make_plot(df: pl.DataFrame, output_dir: Path):
     """Generate a publication-style interaction plot with matplotlib."""
-    import matplotlib.pyplot as plt
     import matplotlib
+    import matplotlib.pyplot as plt
 
     matplotlib.rcParams.update({
         "font.family": "serif",

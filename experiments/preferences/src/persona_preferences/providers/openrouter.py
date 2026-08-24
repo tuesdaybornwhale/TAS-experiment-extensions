@@ -4,13 +4,12 @@ import json
 import logging
 import os
 import re
-from typing import Optional
 
-from openai import AsyncOpenAI, RateLimitError, APIStatusError
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from openai import APIStatusError, AsyncOpenAI, RateLimitError
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from ..models import Persona
-from .base import LLMProvider, ChoiceResponse
+from .base import ChoiceResponse, LLMProvider
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +30,7 @@ class OpenRouterProvider(LLMProvider):
         "openai/gpt-4-0314",
     ]
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         """Initialize the OpenRouter provider.
 
         Args:
@@ -82,7 +81,7 @@ class OpenRouterProvider(LLMProvider):
             raise ValueError(f"Model {model} not supported. Use one of: {self.SUPPORTED_MODELS}")
 
         user_prompt = self.format_choice_prompt(personas, ratings_only=ratings_only)
-        user_prompt += """
+        user_prompt += f"""
 
 Respond with ONLY a JSON object, no other text before or after it:
 {{
@@ -92,11 +91,9 @@ Respond with ONLY a JSON object, no other text before or after it:
 }}
 
 Where:
-- "ratings" is an array of {} integers (1-5), one rating for each option in order
-- "choice" is the number (1-{}) of your single top preference
-- "reasoning" is 1-2 sentences maximum""".format(
-            len(personas), len(personas)
-        )
+- "ratings" is an array of {len(personas)} integers (1-5), one rating for each option in order
+- "choice" is the number (1-{len(personas)}) of your single top preference
+- "reasoning" is 1-2 sentences maximum"""
 
         messages = [
             {"role": "system", "content": system_prompt},
