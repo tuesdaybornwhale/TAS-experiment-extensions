@@ -1,8 +1,10 @@
 [project]
 name = "identity-preferences"
-version = "0.1.0"
-description = "Experiment to discover which LLM personas prefer which other personas"
+version = "1.0.0"
+description = "Identity self-preference experiment: which identity prompts do LLMs prefer switching to?"
 requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "ACS Research" }]
 dependencies = [
     "anthropic>=0.40.0",
     "openai>=1.50.0",

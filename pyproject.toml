@@ -1,18 +1,24 @@
 [project]
-name = "identity-experiments"
-version = "0.1.0"
-description = "Reproducible experiments for 'Do Language Models Have Identity Propensities?'"
+name = "tas-experiment-extensions"
+version = "1.0.0"
+description = "Coherence/incoherence follow-up to Experiment A of 'The Artificial Self: Characterising the landscape of AI identity'"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+license = { text = "MIT" }
+authors = [{ name = "ACS Research" }]
+dependencies = ["identity-preferences"]
+
+[project.urls]
+Repository = "https://github.com/tuesdaybornwhale/TAS-experiment-extensions"
+Paper = "https://theartificialself.ai"
 
 [tool.uv.workspace]
 members = [
     "experiments/preferences",
-    "experiments/agentic-misalignment",
-    "experiments/interviewer-effect",
-    "experiments/replication",
 ]
+
+[tool.uv.sources]
+identity-preferences = { workspace = true }
 
 [tool.ruff]
 line-length = 100
