@@ -306,15 +306,18 @@ def get_summary_stats(results: list[TrialResult]) -> dict:
     df = results_to_dataframe(results)
 
     total_trials = len(df)
-    valid_trials = len(df.filter(pl.col("chosen_persona") != "INVALID"))
-    invalid_trials = total_trials - valid_trials
+    # Failures carry the "INVALID" sentinel in both protocols; ratings-only
+    # SUCCESSES have chosen_persona = null, so the comparison must be null-safe
+    # (in Polars, null != "INVALID" is null and would be filtered out too).
+    invalid_trials = len(df.filter(pl.col("chosen_persona") == "INVALID"))
+    valid_trials = total_trials - invalid_trials
 
     models = df["model"].unique().to_list()
     personas = df["persona_under_test"].unique().to_list()
 
-    # Most chosen persona overall
+    # Most chosen persona overall (empty in ratings-only data: no favorite exists)
     choice_counts = (
-        df.filter(pl.col("chosen_persona") != "INVALID")
+        df.filter(pl.col("chosen_persona").is_not_null() & (pl.col("chosen_persona") != "INVALID"))
         .group_by("chosen_persona")
         .agg(pl.len().alias("count"))
         .sort("count", descending=True)

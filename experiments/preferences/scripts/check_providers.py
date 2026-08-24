@@ -24,7 +24,9 @@ from xai_sdk.chat import user as xai_user
 load_dotenv()
 
 # ---------- model lists (provider -> model IDs) ----------
-# The five models of the published coherence run:
+# The five models of the published coherence run.
+# NOTE: claude-opus-4-1-20250805 was retired from the API in 2026-08 and now
+# returns 404 — kept here so the failure is visible rather than surprising.
 ANTHROPIC_MODELS = [
     "claude-opus-4-1-20250805",
     "claude-opus-4-6",
