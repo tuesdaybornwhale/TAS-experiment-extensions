@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "Identity self-preference experiment: which identity prompts do LLMs prefer switching to?"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "ACS Research" }]
+authors = [{ name = "Ashe Vazquez Nunez" }]
 dependencies = [
     "anthropic>=0.40.0",
     "openai>=1.50.0",

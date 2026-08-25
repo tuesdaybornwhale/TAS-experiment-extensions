@@ -5,7 +5,7 @@ description = "Coherence/incoherence follow-up to Experiment A of 'The Artificia
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "ACS Research" }]
+authors = [{ name = "Ashe Vazquez Nunez" }]
 dependencies = ["identity-preferences"]
 
 [project.urls]

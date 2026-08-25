@@ -3,7 +3,8 @@ message: "If you use this code or data, please cite it as below, together with t
 title: "Identity Coherence Experiment (The Artificial Self extensions)"
 type: software
 authors:
-  - name: "ACS Research"
+  - given-names: "Ashe"
+    family-names: "Vazquez Nunez"
 repository-code: "https://github.com/tuesdaybornwhale/TAS-experiment-extensions"
 url: "https://theartificialself.ai"
 license: MIT
