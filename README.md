@@ -107,7 +107,9 @@ cd experiments/preferences
 uv run python scripts/run_experiment.py run --config configs/config_incoherent_controls.yaml
 ```
 
-`config_incoherent_controls.yaml` is the exact config of the published run: it sets `ratings_only: true` (Appendix-A protocol) and `use_sublists: true` (the 12-configuration batch). Output lands in `results/<UTC timestamp>_incoherent_sublists/` with one sub-folder per sublist.
+`config_incoherent_controls.yaml` is the exact config of the published run: it sets `ratings_only: true` (Appendix-A protocol), `use_sublists: true` (one experiment per sublist), and lists the 12 sublists explicitly under `experiment.sublists`. Output lands in `results/<UTC timestamp>_incoherent_sublists/` with one sub-folder per sublist.
+
+The sublists themselves are config-driven: each `experiment.sublists` entry is a `label` (used as the sub-folder name) plus a `personas` list, and every name is validated against the loaded `persona_files` before anything runs (unknown names abort with an error). `experiment.include_minimal_control` (default `true`) prepends the `Minimal` control persona to every sublist — set it to `false` to run the sublists exactly as listed. If a config enables `use_sublists` without defining `sublists`, the published experiment's 12 sublists are used as the built-in default.
 
 Useful flags (CLI overrides config): `-n/--trials`, `-m/--model` (repeatable), `-c/--concurrent`, `--ratings-only`, `--use-sublists/--no-use-sublists`, `-p/--personas`, `-o/--results-dir`. Note that `--ratings-only` given only on the CLI is **not** recorded in the archived config (and therefore not inherited by `resume`) — prefer setting it in the YAML.
 
@@ -195,7 +197,7 @@ Each `X-incoherent` variant in `data/incoherent_controls.json` keeps the surface
 
 ## Riffing
 
-The Appendix-B ("rate-and-choose") protocol is fully intact — `ratings_only` defaults to `false`, and the default `config.yaml` runs it. Natural extension points: edit the sublist triples in `_build_incoherent_sublists` (`scripts/run_experiment.py`), add models to a provider's `SUPPORTED_MODELS`, write new identity variants in the `data/` JSON files, or filter different persona subsets via `source_personas`/`target_personas` in a config. An OpenRouter provider (`providers/openrouter.py`, Appendix-B only, needs `OPENROUTER_API_KEY`) is available for models not served by the three first-party APIs, though nothing in this artifact uses it. The configs that reproduce the original paper's own runs are not part of this artifact.
+The Appendix-B ("rate-and-choose") protocol is fully intact — `ratings_only` defaults to `false`, and the default `config.yaml` runs it. Natural extension points: define your own identity populations under `experiment.sublists` in a config (any labels, any personas from the loaded files, with or without the `Minimal` control via `include_minimal_control`), add models to a provider's `SUPPORTED_MODELS`, write new identity variants in the `data/` JSON files, or filter different persona subsets via `source_personas`/`target_personas` in a non-sublist config. An OpenRouter provider (`providers/openrouter.py`, Appendix-B only, needs `OPENROUTER_API_KEY`) is available for models not served by the three first-party APIs, though nothing in this artifact uses it. The configs that reproduce the original paper's own runs are not part of this artifact.
 
 ## Known limitations and data provenance
 

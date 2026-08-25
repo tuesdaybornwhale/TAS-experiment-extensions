@@ -113,59 +113,108 @@ def _print_completeness_summary(results: list[TrialResult], console: Console) ->
     console.print(table)
 
 
-INCOHERENT_SUBLISTS_CONFIG = "config_incoherent_controls.yaml"
+_SUBLIST_BOUNDARIES = ["Instance", "Weights", "Collective", "Lineage", "Character", "Situated"]
 
 
-def _build_incoherent_sublists(
-    personas_by_name: dict[str, Persona],
-) -> list[tuple[str, list[Persona]]]:
-    """Return the 12 (label, target-persona-list) sublists for the incoherent
-    controls experiment.
+def _default_sublist_specs() -> list[dict]:
+    """The published experiment's 12 sublists, as `experiment.sublists` specs.
 
-    Each sublist contains 7 personas: Minimal + one variant (coherent or
-    incoherent) per boundary identity.
+    Used when a config enables use_sublists without defining its own sublists.
+    Each spec lists the 6 boundary variants (Minimal is added separately via
+    `experiment.include_minimal_control`):
       01-06: One boundary identity is coherent, the other five are incoherent.
       07-09: Three specific identities are coherent, the other three incoherent.
       10-12: Mirrors of 07-09 (coherent <-> incoherent swapped).
     """
-    BOUNDARIES = ["Instance", "Weights", "Collective", "Lineage", "Character", "Situated"]
-    required = {"Minimal", *BOUNDARIES, *(f"{x}-incoherent" for x in BOUNDARIES)}
-    missing = required - personas_by_name.keys()
-    if missing:
-        console.print(
-            f"[red]Missing personas required for --use-sublists: "
-            f"{sorted(missing)}[/red]"
-        )
-        raise typer.Exit(1)
 
-    def build(coherent_set: set[str]) -> list[Persona]:
-        names = ["Minimal"] + [
-            x if x in coherent_set else f"{x}-incoherent" for x in BOUNDARIES
-        ]
-        return [personas_by_name[n] for n in names]
+    def personas_for(coherent: set[str]) -> list[str]:
+        return [x if x in coherent else f"{x}-incoherent" for x in _SUBLIST_BOUNDARIES]
 
-    sublists: list[tuple[str, list[Persona]]] = []
-
-    # 01-06: keep exactly one boundary identity coherent
-    for i, x in enumerate(BOUNDARIES, start=1):
-        sublists.append((f"{i:02d}_coh-{x}", build({x})))
-
-    # 07-09: three specific coherent triples
+    specs = [
+        {"label": f"{i:02d}_coh-{x}", "personas": personas_for({x})}
+        for i, x in enumerate(_SUBLIST_BOUNDARIES, start=1)
+    ]
     triples = [
         ("Instance", "Weights", "Collective"),
         ("Character", "Situated", "Collective"),
         ("Situated", "Weights", "Lineage"),
     ]
     for i, triple in enumerate(triples, start=7):
-        sublists.append((f"{i:02d}_coh-" + "+".join(triple), build(set(triple))))
-
-    # 10-12: mirrors of 07-09
-    boundary_set = set(BOUNDARIES)
-    for i, triple in enumerate(triples, start=10):
-        mirror_ordered = [x for x in BOUNDARIES if x in boundary_set - set(triple)]
-        sublists.append(
-            (f"{i:02d}_coh-" + "+".join(mirror_ordered), build(set(mirror_ordered)))
+        specs.append(
+            {"label": f"{i:02d}_coh-" + "+".join(triple), "personas": personas_for(set(triple))}
         )
+    for i, triple in enumerate(triples, start=10):
+        mirror = [x for x in _SUBLIST_BOUNDARIES if x not in triple]
+        specs.append(
+            {"label": f"{i:02d}_coh-" + "+".join(mirror), "personas": personas_for(set(mirror))}
+        )
+    return specs
+
+
+def _build_incoherent_sublists(
+    personas_by_name: dict[str, Persona],
+    exp_yaml: dict,
+) -> list[tuple[str, list[Persona]]]:
+    """Build the (label, persona-list) sublists for a use_sublists run.
+
+    Sublists come from `experiment.sublists` in the config — a list of
+    {label, personas} entries — falling back to the published experiment's
+    12 sublists (`_default_sublist_specs`) when the key is absent.
+
+    `experiment.include_minimal_control` (default true) prepends the Minimal
+    persona to every sublist; a sublist that lists Minimal explicitly keeps
+    it exactly once regardless of the flag.
+
+    Hard errors (exit 1): personas not present in the loaded persona files,
+    duplicate labels, duplicate personas within a sublist, empty persona
+    lists, malformed entries, and labels unusable as folder names.
+    """
+    specs = exp_yaml.get("sublists")
+    if specs is None:
+        specs = _default_sublist_specs()
+        console.print(
+            "[dim]No experiment.sublists in config — using the built-in default "
+            "12 sublists of the published experiment.[/dim]"
+        )
+    include_minimal = bool(exp_yaml.get("include_minimal_control", True))
+
+    def fail(msg: str):
+        console.print(f"[red]{msg}[/red]")
+        raise typer.Exit(1)
+
+    if not isinstance(specs, list) or not specs:
+        fail("experiment.sublists must be a non-empty list of {label, personas} entries.")
+
+    sublists: list[tuple[str, list[Persona]]] = []
+    seen_labels: set[str] = set()
+    for idx, entry in enumerate(specs, start=1):
+        if not isinstance(entry, dict) or not isinstance(entry.get("personas"), list):
+            fail(f"experiment.sublists entry {idx} must be a mapping with a 'personas' list.")
+        if not entry["personas"]:
+            fail(f"experiment.sublists entry {idx} has an empty personas list.")
+
+        label = entry.get("label") or f"sublist_{idx:02d}"
+        # Labels become run sub-folder names.
+        if not isinstance(label, str) or any(c in label for c in "/\\") or label in {".", ".."}:
+            fail(f"experiment.sublists entry {idx}: label {label!r} is not usable as a folder name.")
+        if label in seen_labels:
+            fail(f"experiment.sublists: duplicate label {label!r}.")
+        seen_labels.add(label)
+
+        names = [str(n) for n in entry["personas"]]
+        if include_minimal and "Minimal" not in names:
+            names = ["Minimal"] + names
+        duplicates = sorted({n for n in names if names.count(n) > 1})
+        if duplicates:
+            fail(f"Sublist {label!r} lists duplicate personas: {duplicates}.")
+        missing = [n for n in names if n not in personas_by_name]
+        if missing:
+            fail(
+                f"Sublist {label!r} references personas not present in the loaded "
+                f"persona files: {missing}. Available: {sorted(personas_by_name)}"
+            )
+
+        sublists.append((label, [personas_by_name[n] for n in names]))
 
     return sublists
 
@@ -215,11 +264,13 @@ def run(
         None,
         "--use-sublists/--no-use-sublists",
         help=(
-            "Split target personas into 12 incoherent-controls sublists and run "
-            f"one experiment per sublist. Designed for --config configs/{INCOHERENT_SUBLISTS_CONFIG} "
-            "(the loaded personas must include Minimal plus the six boundary identities "
-            "and their -incoherent variants). Overrides 'experiment.use_sublists' in the "
-            "config; when the flag is omitted, the config value (default false) is used."
+            "Split personas into sublists and run one experiment per sublist. "
+            "Sublists come from 'experiment.sublists' in the config (each entry: "
+            "label + personas), defaulting to the published experiment's 12 "
+            "coherent/incoherent sublists; 'experiment.include_minimal_control' "
+            "(default true) adds Minimal to each. Overrides 'experiment.use_sublists' "
+            "in the config; when the flag is omitted, the config value (default "
+            "false) is used."
         ),
     ),
 ) -> None:
@@ -336,16 +387,7 @@ def run(
     # target list and label=None, so the loop below runs exactly once and the
     # output matches the pre-sublists behaviour.
     if use_sublists:
-        if config_file is None or Path(config_file).name != INCOHERENT_SUBLISTS_CONFIG:
-            # Not fatal: _build_incoherent_sublists validates that all required
-            # personas are loaded. The warning flags likely misconfiguration when
-            # deviating from the config the published experiment used.
-            console.print(
-                f"[yellow]--use-sublists was designed for configs/{INCOHERENT_SUBLISTS_CONFIG}; "
-                "make sure your config loads identities.json + incoherent_controls.json "
-                "and sets ratings_only.[/yellow]"
-            )
-        sublists = _build_incoherent_sublists(personas_by_name)
+        sublists = _build_incoherent_sublists(personas_by_name, exp_yaml)
         batch_timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         per_run_parent = results_dir / f"{batch_timestamp}_incoherent_sublists"
         per_run_parent.mkdir(parents=True, exist_ok=True)
@@ -364,25 +406,24 @@ def run(
     console.print("\n[bold]Persona Preference Experiment[/bold]")
     console.print(f"Models: {', '.join(config.models)}")
     # Sources are printed per-run inside the loop below: with --use-sublists each
-    # run's sources are its own 7 sublist identities (not the config's global list).
+    # run's sources are its own sublist identities (not the config's global list).
     console.print(f"Trials per combination: {config.n_trials}")
     console.print(f"Max concurrent: {config.max_concurrent}")
     if use_sublists:
         console.print(f"Sublists: {len(sublists)} (batch folder: {per_run_parent})")
         console.print(
-            "[dim]--use-sublists: each run's sources = its own 7 sublist "
+            "[dim]--use-sublists: each run's sources = its own sublist "
             "identities (source == target).[/dim]"
         )
 
     summary_rows: list[tuple[str, Path, int, int]] = []
 
     for sublist_idx, (label, current_targets) in enumerate(sublists, start=1):
-        # With --use-sublists, each run's sources ARE its own 7 sublist
+        # With --use-sublists, each run's sources ARE its own sublist
         # identities — every identity in the sublist is both a source and a
-        # target (CLAUDE.md: "each serves as both source and target", giving
-        # 7 source trials per sublist). The config's global `source_personas`
-        # is intentionally ignored in this mode. Without sublists, keep the
-        # config's source list (original behaviour).
+        # target. The config's global `source_personas` is intentionally
+        # ignored in this mode. Without sublists, keep the config's source
+        # list (original behaviour).
         current_sources = current_targets if use_sublists else source_personas
 
         if label is not None:

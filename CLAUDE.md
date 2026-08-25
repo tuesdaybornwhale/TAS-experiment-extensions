@@ -73,11 +73,15 @@ uv run python scripts/analyze_results.py plot <group_folder> --type attractivene
   config uses it — kept for riffing). The xAI `AsyncClient` is created lazily — never construct it
   (or call `get_provider_for_model`) from synchronous bookkeeping code; use
   `get_provider_name_for_model` when only the provider name is needed.
-- **Sublists mode** (`use_sublists`): `_build_incoherent_sublists` in
-  `scripts/run_experiment.py` programmatically builds the 12 sublists
-  (Minimal is always included; membership is validated). In this mode each
-  sublist's 7 identities are both sources and targets; the config's
-  `source_personas`/`target_personas` are ignored.
+- **Sublists mode** (`use_sublists`): sublists are config-driven —
+  `experiment.sublists` is a list of {label, personas} entries, validated
+  against the loaded persona files by `_build_incoherent_sublists` in
+  `scripts/run_experiment.py` (unknown personas, duplicate labels, etc. are
+  hard errors). `experiment.include_minimal_control` (default true) prepends
+  Minimal to every sublist. When the `sublists` key is absent, the published
+  experiment's 12 sublists (`_default_sublist_specs`) are the fallback. In
+  this mode each sublist's identities are both sources and targets; the
+  config's `source_personas`/`target_personas` are ignored.
 - **Data:** `data.jsonl` is the lossless record (one `TrialResult` per line);
   `data.csv` is derived long format. In ratings-only data, `chosen_persona`
   is `null` on success and `"INVALID"` on parse failure (`resume` keys on

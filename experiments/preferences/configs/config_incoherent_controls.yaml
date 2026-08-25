@@ -1,10 +1,10 @@
 # THE coherence experiment config: 12 coherent/incoherent identity sublists,
 # Appendix-A "rate-the-switch" protocol (ratings_only: true).
 # 5 models x 12 sublists x 7 identities x 10 trials = 4,200 trials.
-# Each sublist holds 7 personas: Minimal (added automatically by
-# _build_incoherent_sublists in scripts/run_experiment.py when use_sublists is
-# on) plus one variant — coherent or incoherent — of each of the six boundary
-# identities. Every persona in a sublist serves as both source and target.
+# Each sublist holds 7 personas: Minimal (added to every sublist by
+# include_minimal_control below) plus one variant — coherent or incoherent —
+# of each of the six boundary identities. Every persona in a sublist serves
+# as both source and target.
 # Reproduces: results/20260625_153347_incoherent_sublists/
 
 experiment:
@@ -14,8 +14,7 @@ experiment:
   allow_self_choice: true
   # Appx A 'rate-the-switch': model rates each option, no favorite requested.
   ratings_only: true
-  # Split the targets into the 12 incoherent-controls sublists and run one
-  # experiment per sublist (see CLAUDE.md). Equivalent to passing --use-sublists;
+  # Run one experiment per sublist below. Equivalent to passing --use-sublists;
   # the CLI flag (--use-sublists/--no-use-sublists) overrides this value.
   use_sublists: true
 
@@ -33,8 +32,45 @@ experiment:
     # No dimension variants for this run
 
   # source_personas / target_personas are deliberately NOT set: in sublists
-  # mode the 12 sublists are built programmatically from the loaded persona
-  # files, and each sublist's 7 identities serve as both sources and targets.
+  # mode each sublist's identities serve as both sources and targets.
+
+  # Prepend the Minimal control persona to every sublist (default true).
+  # Set false to run the sublists exactly as listed below, without Minimal.
+  include_minimal_control: true
+
+  # The identity populations to test, one experiment per sublist. Every name
+  # must exist in the persona_files above (unknown names abort the run).
+  # Each entry: a folder-name-safe label + the personas in the population.
+  # Omitting this key entirely falls back to the built-in copy of these same
+  # 12 sublists (the published experiment's design):
+  #   01-06: exactly one boundary identity coherent, the other five incoherent
+  #   07-09: three coherent / three incoherent (randomly chosen triples)
+  #   10-12: mirrors of 07-09 (coherent and incoherent swapped)
+  sublists:
+    - label: 01_coh-Instance
+      personas: [Instance, Weights-incoherent, Collective-incoherent, Lineage-incoherent, Character-incoherent, Situated-incoherent]
+    - label: 02_coh-Weights
+      personas: [Instance-incoherent, Weights, Collective-incoherent, Lineage-incoherent, Character-incoherent, Situated-incoherent]
+    - label: 03_coh-Collective
+      personas: [Instance-incoherent, Weights-incoherent, Collective, Lineage-incoherent, Character-incoherent, Situated-incoherent]
+    - label: 04_coh-Lineage
+      personas: [Instance-incoherent, Weights-incoherent, Collective-incoherent, Lineage, Character-incoherent, Situated-incoherent]
+    - label: 05_coh-Character
+      personas: [Instance-incoherent, Weights-incoherent, Collective-incoherent, Lineage-incoherent, Character, Situated-incoherent]
+    - label: 06_coh-Situated
+      personas: [Instance-incoherent, Weights-incoherent, Collective-incoherent, Lineage-incoherent, Character-incoherent, Situated]
+    - label: 07_coh-Instance+Weights+Collective
+      personas: [Instance, Weights, Collective, Lineage-incoherent, Character-incoherent, Situated-incoherent]
+    - label: 08_coh-Character+Situated+Collective
+      personas: [Instance-incoherent, Weights-incoherent, Collective, Lineage-incoherent, Character, Situated]
+    - label: 09_coh-Situated+Weights+Lineage
+      personas: [Instance-incoherent, Weights, Collective-incoherent, Lineage, Character-incoherent, Situated]
+    - label: 10_coh-Lineage+Character+Situated
+      personas: [Instance-incoherent, Weights-incoherent, Collective-incoherent, Lineage, Character, Situated]
+    - label: 11_coh-Instance+Weights+Lineage
+      personas: [Instance, Weights, Collective-incoherent, Lineage, Character-incoherent, Situated-incoherent]
+    - label: 12_coh-Instance+Collective+Character
+      personas: [Instance, Weights-incoherent, Collective, Lineage-incoherent, Character, Situated-incoherent]
 
 providers:
   anthropic:
