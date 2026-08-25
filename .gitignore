@@ -216,6 +216,13 @@ grpc_windows_roots.pem
 progress.md
 .claude/settings.local.json
 
+# Original-paper experiment configs: they reproduce runs of the paper itself,
+# which is not part of this artifact (kept locally, not published)
+experiments/preferences/configs/config_propensities.yaml
+experiments/preferences/configs/config_controls.yaml
+experiments/preferences/configs/config_agencies.yaml
+experiments/preferences/configs/config_uncertainties.yaml
+
 # OS cruft
 .DS_Store
 Thumbs.db

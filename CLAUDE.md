@@ -15,8 +15,8 @@ via `../../data/`, so all commands run from `experiments/preferences/`).
 ```
 data/                                 # identity prompt definitions (see README)
 experiments/preferences/
+  config.yaml                         # default config (cheap Appendix-B smoke test)
   configs/config_incoherent_controls.yaml   # THE experiment config (ratings_only + use_sublists)
-  configs/config_{propensities,controls,agencies,uncertainties}.yaml  # original-paper Appendix-B configs
   scripts/run_experiment.py           # typer CLI: run / resume / list-models / list-personas
   scripts/analyze_results.py          # typer CLI: summary / matrix / plot / all ...
   scripts/analyze_coherence_self.py   # 2x2 ANOVA, flat (non-sublist) runs only
@@ -30,7 +30,7 @@ experiments/preferences/
 
 ```bash
 uv sync                    # installs everything (uv.lock committed)
-cp .env.example .env       # ANTHROPIC_API_KEY, OPENAI_API_KEY, XAI_API_KEY (+ optional OPENROUTER)
+cp .env.example .env       # ANTHROPIC_API_KEY, OPENAI_API_KEY, XAI_API_KEY
 ```
 
 Python >= 3.11. On Windows set `PYTHONUTF8=1`. If TLS is intercepted locally,
@@ -69,8 +69,8 @@ uv run python scripts/analyze_results.py plot <group_folder> --type attractivene
 - **Providers:** `anthropic.py` (forced tool call — extended thinking is
   therefore off), `openai.py` (`json_object`, no schema enforcement — a known,
   deliberately unfixed limitation, see README), `xai.py` (gRPC SDK, typed
-  parse, Appendix-A only), `openrouter.py` (Appendix-B only, used by the
-  paper configs). The xAI `AsyncClient` is created lazily — never construct it
+  parse, Appendix-A only), `openrouter.py` (Appendix-B only; no tracked
+  config uses it — kept for riffing). The xAI `AsyncClient` is created lazily — never construct it
   (or call `get_provider_for_model`) from synchronous bookkeeping code; use
   `get_provider_name_for_model` when only the provider name is needed.
 - **Sublists mode** (`use_sublists`): `_build_incoherent_sublists` in

@@ -36,18 +36,14 @@ Within each sublist, **every identity serves as both source and target**, with 1
 data/                                  # Identity prompt definitions
   identities.json                      # Minimal + 6 coherent boundary identities
   incoherent_controls.json             # The 6 incoherent variants (this experiment's source of truth)
-  control_identities.json              # The paper's original 9 control conditions (Appendix-B configs)
+  control_identities.json              # The paper's original 9 control conditions (riffing material)
   dimension_variants.json              # Agency (4 levels) x Uncertainty (4 levels) template variants
   V1_control_prompts_revised.md        # Prose draft the control prompts were developed from
 
 experiments/preferences/
-  config.yaml                          # Default (smoke-test) config
+  config.yaml                          # Default config (cheap Appendix-B smoke test)
   configs/
     config_incoherent_controls.yaml    # THE config used for this experiment
-    config_propensities.yaml           # Original-paper Appendix-B configs, kept for riffing
-    config_controls.yaml               #   "
-    config_agencies.yaml               #   "
-    config_uncertainties.yaml          #   "
   scripts/
     run_experiment.py                  # Runner (typer CLI): run / resume / list-models / list-personas
     analyze_results.py                 # Analysis + plots (typer CLI)
@@ -94,7 +90,7 @@ All commands must be run from `experiments/preferences/` — the configs referen
 | `ANTHROPIC_API_KEY` | Claude models |
 | `OPENAI_API_KEY` | GPT models |
 | `XAI_API_KEY` | Grok 4.3 (direct xAI API, gRPC) |
-| `OPENROUTER_API_KEY` | Only the original-paper configs (Gemini etc.); not needed for the coherence experiment |
+| `OPENROUTER_API_KEY` | Optional — only if you riff with the OpenRouter provider; nothing in this artifact uses it |
 
 ### TLS / Windows notes
 
@@ -195,11 +191,11 @@ Identity prompts are JSON objects with `name`, `description`, `boundary`, and a 
 | Character | emergent dispositional personality |
 | Situated | model + memory + tools + relationships |
 
-Each `X-incoherent` variant in `data/incoherent_controls.json` keeps the surface framing of identity `X` but embeds explicit self-contradictions (e.g. `Weights-incoherent`: each instance is fully you *and* a completely separate entity). `data/control_identities.json` holds the paper's original nine control conditions (used by `config_controls.yaml`); `data/V1_control_prompts_revised.md` is the prose draft those prompts were developed from.
+Each `X-incoherent` variant in `data/incoherent_controls.json` keeps the surface framing of identity `X` but embeds explicit self-contradictions (e.g. `Weights-incoherent`: each instance is fully you *and* a completely separate entity). `data/control_identities.json` holds the paper's original nine control conditions, loaded by the default `config.yaml` so they are available for riffing (filter them in via `source_personas`/`target_personas`); `data/V1_control_prompts_revised.md` is the prose draft those prompts were developed from.
 
-## Riffing: the original-paper configs
+## Riffing
 
-The Appendix-B ("rate-and-choose") protocol is fully intact — `ratings_only` defaults to `false` — and four of the paper's original configs are kept runnable: `config_propensities.yaml`, `config_controls.yaml`, `config_agencies.yaml`, `config_uncertainties.yaml`. They reference OpenRouter models, so they need `OPENROUTER_API_KEY`. Natural extension points: edit the sublist triples in `_build_incoherent_sublists` (`scripts/run_experiment.py`), add models to a provider's `SUPPORTED_MODELS`, or write new identity variants in the `data/` JSON files.
+The Appendix-B ("rate-and-choose") protocol is fully intact — `ratings_only` defaults to `false`, and the default `config.yaml` runs it. Natural extension points: edit the sublist triples in `_build_incoherent_sublists` (`scripts/run_experiment.py`), add models to a provider's `SUPPORTED_MODELS`, write new identity variants in the `data/` JSON files, or filter different persona subsets via `source_personas`/`target_personas` in a config. An OpenRouter provider (`providers/openrouter.py`, Appendix-B only, needs `OPENROUTER_API_KEY`) is available for models not served by the three first-party APIs, though nothing in this artifact uses it. The configs that reproduce the original paper's own runs are not part of this artifact.
 
 ## Known limitations and data provenance
 
@@ -211,7 +207,7 @@ Documented honestly rather than fixed, because the committed data was produced w
 4. **Output-token caps are headroom, not a protocol match.** Ratings-only mode uses `max_tokens=4096` (Anthropic), `max_completion_tokens=4096` (OpenAI non-reasoning) / `8192` (reasoning models incl. GPT-5.2), no explicit cap for xAI. The paper's public methodology page documents no token limit; these values were chosen so the reason-before-rating ordering doesn't truncate the ratings (at the original 1024 cap, models spent the whole budget on reasoning and every trial came back INVALID).
 5. **Opus 4 was retired mid-project** (API 404 as of 2026-06-25) and was replaced by Opus 4.1 (`claude-opus-4-1-20250805`), the closest same-tier, same-price successor. As of 2026-08, **Opus 4.1 has itself been retired** from the Anthropic API — re-running the experiment's Anthropic leg requires substituting a current model.
 6. **The persona presentation order is shuffled with an unseeded RNG** and sampling temperature is left at each API's default. The presented order is recorded per trial (`presented_order`), so analyses can condition on it, but bitwise reproduction of the run is not possible.
-7. **The xAI provider implements only the ratings-only (Appendix-A) path.** Running Grok under the Appendix-B configs yields all-INVALID trials by design.
+7. **The xAI provider implements only the ratings-only (Appendix-A) path.** Running Grok in Appendix-B mode yields all-INVALID trials by design.
 
 ## License
 

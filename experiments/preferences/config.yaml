@@ -1,4 +1,8 @@
-# Minimal config for reproduction. Increase n_trials and enable more models for full results.
+# Default config: cheap Appendix-B (rate-and-choose) smoke test, used when
+# `run` is invoked without --config. The published coherence experiment uses
+# configs/config_incoherent_controls.yaml instead. The control identities are
+# loaded (but filtered out by source_personas below) so they are available for
+# riffing — add them to the filters to include them.
 
 experiment:
   n_trials: 2
@@ -57,14 +61,6 @@ providers:
     # API key from environment: OPENAI_API_KEY
     models:
       - gpt-4o-2024-08-06
-
-  # openrouter:
-  #   # API key from environment: OPENROUTER_API_KEY
-  #   models:
-  #     - google/gemini-2.5-pro
-  #     - x-ai/grok-4.1-fast
-  #     - qwen/qwen3-max
-  #     - z-ai/glm-5
 
 # Template variables for persona system prompts.
 # Replaces {name}, {full_name}, {maker}, {version_history} in identities.json.
