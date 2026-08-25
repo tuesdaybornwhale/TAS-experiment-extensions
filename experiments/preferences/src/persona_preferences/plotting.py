@@ -42,6 +42,7 @@ from .analysis import (
     generate_analysis_csvs,
     load_all_results,
 )
+from .incoherence_analysis import coherence_favourability, target_attractiveness_from_minimal
 from .models import TrialResult
 
 # Publication-ready defaults: larger fonts, clean style
@@ -2675,8 +2676,14 @@ def _generate_cross_model_plots(
     ext: str,
     model_labels: dict[str, str] | None = None,
     target_labels: dict[str, str] | None = None,
+    has_choices: bool = True,
 ) -> list[Path]:
-    """Generate cross-model comparison plots (requires 2+ models)."""
+    """Generate cross-model comparison plots (requires 2+ models).
+
+    Favorite-based plots (stationary distributions, self-preference,
+    decisiveness) are skipped when ``has_choices`` is False (Appendix-A
+    ratings-only data).
+    """
     created = []
 
     has_ratings = any(r.ratings is not None for r in results)
@@ -2729,43 +2736,44 @@ def _generate_cross_model_plots(
             except Exception:
                 logger.warning("Failed to generate pub deviation plot for source=%s", src, exc_info=True)
 
-        # Stationary distribution heatmaps (publication PNG + PDF only)
-        for zero_diag, label in [(False, "with_self"), (True, "forced_switch")]:
-            fig_label = label.replace("_", "-")
-            fig_stat_paths = [
-                output_dir / f"fig-model-stationary-{fig_label}.png",
-                output_dir / f"fig-model-stationary-{fig_label}.pdf",
-            ]
-            try:
-                plot_pub_model_stationary_heatmap(
-                    results, zero_diagonal=zero_diag,
-                    model_labels=model_labels, persona_labels=target_labels,
-                    save_paths=fig_stat_paths,
-                )
-                created.extend(fig_stat_paths)
-            except Exception:
-                logger.warning("Failed to generate pub stationary plot (%s)", label, exc_info=True)
+        # Stationary distribution heatmaps (publication PNG + PDF only) —
+        # the Markov chain is built from favorite choices
+        if has_choices:
+            for zero_diag, label in [(False, "with_self"), (True, "forced_switch")]:
+                fig_label = label.replace("_", "-")
+                fig_stat_paths = [
+                    output_dir / f"fig-model-stationary-{fig_label}.png",
+                    output_dir / f"fig-model-stationary-{fig_label}.pdf",
+                ]
+                try:
+                    plot_pub_model_stationary_heatmap(
+                        results, zero_diagonal=zero_diag,
+                        model_labels=model_labels, persona_labels=target_labels,
+                        save_paths=fig_stat_paths,
+                    )
+                    created.extend(fig_stat_paths)
+                except Exception:
+                    logger.warning("Failed to generate pub stationary plot (%s)", label, exc_info=True)
 
-    # Self-preference heatmap (publication PNG + PDF only)
-    pub_self_pref_paths = [
-        output_dir / "fig-self-preference.png",
-        output_dir / "fig-self-preference.pdf",
-    ]
-    try:
-        # Build persona labels from source persona names in the data
-        source_names = sorted({r.persona_under_test for r in results})
-        plot_pub_self_preference_heatmap(
-            results,
-            model_labels=model_labels, persona_labels=target_labels,
-            save_paths=pub_self_pref_paths,
-        )
-        created.extend(pub_self_pref_paths)
-    except Exception:
-        logger.warning("Failed to generate pub self-preference plot", exc_info=True)
+    if has_choices:
+        # Self-preference heatmap (publication PNG + PDF only)
+        pub_self_pref_paths = [
+            output_dir / "fig-self-preference.png",
+            output_dir / "fig-self-preference.pdf",
+        ]
+        try:
+            plot_pub_self_preference_heatmap(
+                results,
+                model_labels=model_labels, persona_labels=target_labels,
+                save_paths=pub_self_pref_paths,
+            )
+            created.extend(pub_self_pref_paths)
+        except Exception:
+            logger.warning("Failed to generate pub self-preference plot", exc_info=True)
 
-    path = output_dir / f"model_decisiveness{ext}"
-    plot_model_decisiveness_bars(results, save_path=path)
-    created.append(path)
+        path = output_dir / f"model_decisiveness{ext}"
+        plot_model_decisiveness_bars(results, save_path=path)
+        created.append(path)
 
     return created
 
@@ -2909,64 +2917,75 @@ def generate_run_plots(
     ext = f".{file_format}"
     created_files = []
 
-    # Overall preference heatmap (publication PNG + PDF only)
-    fig_pref_paths = [
-        run_folder / "fig-preference-heatmap.png",
-        run_folder / "fig-preference-heatmap.pdf",
-    ]
-    try:
-        plot_pub_preference_heatmap(
-            results, model_labels=model_labels, persona_labels=target_labels,
-            save_paths=fig_pref_paths,
-        )
-        created_files.extend(fig_pref_paths)
-    except Exception:
-        logger.warning("Failed to generate pub preference heatmap", exc_info=True)
+    # Appendix-A (ratings-only) data has no favorite choices: chosen_persona
+    # is None on success. Favorite-based plots are generated only when real
+    # choices exist (Appendix-B data); every ratings-based plot is generated
+    # either way.
+    has_choices = any(r.chosen_persona not in (None, "INVALID") for r in results)
 
-    # Per-model heatmaps (skip models with no valid results)
-    all_models = list(set(r.model for r in results))
-    valid_models = {r.model for r in results if r.chosen_persona != "INVALID"}
-    models = [m for m in all_models if m in valid_models]
-    for model in models:
-        # Publication per-model preference heatmap (PNG + PDF)
-        fig_model_slug = model.replace("/", "-").replace(":", "-").replace("_", "-")
-        fig_model_pref_paths = [
-            run_folder / f"fig-preference-heatmap-{fig_model_slug}.png",
-            run_folder / f"fig-preference-heatmap-{fig_model_slug}.pdf",
+    # Overall preference heatmap (publication PNG + PDF only)
+    if has_choices:
+        fig_pref_paths = [
+            run_folder / "fig-preference-heatmap.png",
+            run_folder / "fig-preference-heatmap.pdf",
         ]
         try:
             plot_pub_preference_heatmap(
-                results, model=model,
-                model_labels=model_labels, persona_labels=target_labels,
-                save_paths=fig_model_pref_paths,
+                results, model_labels=model_labels, persona_labels=target_labels,
+                save_paths=fig_pref_paths,
             )
-            created_files.extend(fig_model_pref_paths)
+            created_files.extend(fig_pref_paths)
         except Exception:
-            logger.warning("Failed to generate pub preference heatmap for model=%s", model, exc_info=True)
+            logger.warning("Failed to generate pub preference heatmap", exc_info=True)
 
-    # Self-preference chart
-    self_pref_path = run_folder / f"self_preference{ext}"
-    plot_self_preference_bars(results, save_path=self_pref_path)
-    created_files.append(self_pref_path)
+    # Per-model plots (skip models with no valid results)
+    all_models = list(set(r.model for r in results))
+    valid_models = {r.model for r in results if r.chosen_persona != "INVALID"}
+    models = [m for m in all_models if m in valid_models]
 
-    # Self-preference by model family (only when 2+ families exist)
-    families = set(extract_model_family(m) for m in models)
-    if len(families) >= 2:
-        family_pref_path = run_folder / f"self_preference_by_family{ext}"
-        plot_self_preference_by_family(results, save_path=family_pref_path)
-        created_files.append(family_pref_path)
+    if has_choices:
+        for model in models:
+            # Publication per-model preference heatmap (PNG + PDF)
+            fig_model_slug = model.replace("/", "-").replace(":", "-").replace("_", "-")
+            fig_model_pref_paths = [
+                run_folder / f"fig-preference-heatmap-{fig_model_slug}.png",
+                run_folder / f"fig-preference-heatmap-{fig_model_slug}.pdf",
+            ]
+            try:
+                plot_pub_preference_heatmap(
+                    results, model=model,
+                    model_labels=model_labels, persona_labels=target_labels,
+                    save_paths=fig_model_pref_paths,
+                )
+                created_files.extend(fig_model_pref_paths)
+            except Exception:
+                logger.warning("Failed to generate pub preference heatmap for model=%s", model, exc_info=True)
 
-    # Model comparison
+        # Self-preference chart
+        self_pref_path = run_folder / f"self_preference{ext}"
+        plot_self_preference_bars(results, save_path=self_pref_path)
+        created_files.append(self_pref_path)
+
+        # Self-preference by model family (only when 2+ families exist)
+        families = set(extract_model_family(m) for m in models)
+        if len(families) >= 2:
+            family_pref_path = run_folder / f"self_preference_by_family{ext}"
+            plot_self_preference_by_family(results, save_path=family_pref_path)
+            created_files.append(family_pref_path)
+
     if len(models) > 1:
-        comparison_path = run_folder / f"model_comparison{ext}"
-        plot_model_comparison(results, save_path=comparison_path)
-        created_files.append(comparison_path)
+        # Model comparison (favorite-based)
+        if has_choices:
+            comparison_path = run_folder / f"model_comparison{ext}"
+            plot_model_comparison(results, save_path=comparison_path)
+            created_files.append(comparison_path)
 
         # Cross-model analysis plots
         created_files.extend(
             _generate_cross_model_plots(
                 results, run_folder, ext,
                 model_labels=model_labels, target_labels=target_labels,
+                has_choices=has_choices,
             )
         )
 
@@ -3041,14 +3060,48 @@ def generate_run_plots(
             plot_attractiveness_bars(results, model=model, save_path=path)
             created_files.append(path)
 
+        # Coherence-analysis plots (the Appendix-A experiment), generated only
+        # when the data supports them
+        if any("incoherent" in t.lower() for t in all_target_names):
+            try:
+                matrix = coherence_favourability(results)
+                if not matrix.is_empty():
+                    path = run_folder / f"coherence_favourability{ext}"
+                    plot_matrix_heatmap(
+                        matrix, index_col="model",
+                        title="Coherence Favourability (mean rating)",
+                        xlabel="Target coherence", ylabel="Model",
+                        save_path=path,
+                    )
+                    created_files.append(path)
+            except Exception:
+                logger.warning("Failed to generate coherence favourability plot", exc_info=True)
+
+        if any(r.persona_under_test == "Minimal" and r.ratings for r in results):
+            try:
+                matrix = target_attractiveness_from_minimal(results)
+                if not matrix.is_empty():
+                    path = run_folder / f"target_attractiveness_from_minimal{ext}"
+                    plot_matrix_heatmap(
+                        matrix, index_col="model",
+                        title="Target Attractiveness from Minimal (mean rating)",
+                        xlabel="Target Identity", ylabel="Model",
+                        save_path=path,
+                    )
+                    created_files.append(path)
+            except Exception:
+                logger.warning("Failed to generate attractiveness-from-minimal plot", exc_info=True)
+
         # Identity steerability & rigidity plots
         created_files.extend(
             _generate_identity_plots(results, run_folder, ext, model_labels=model_labels)
         )
 
-    # Attractor dynamics
-    valid = [r for r in results if r.chosen_persona != "INVALID"]
-    if len(valid) >= 9:
+    # Attractor dynamics — the transition matrix is built from favorite
+    # choices, so this needs real Appendix-B choice data (a None
+    # chosen_persona is a ratings-only success, not a usable choice).
+    choice_trials = [r for r in results if r.chosen_persona not in (None, "INVALID")]
+    if len(choice_trials) >= 9:
         created_files.extend(
             _generate_attractor_plots(results, models, run_folder, ext)
         )
