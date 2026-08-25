@@ -8,7 +8,7 @@ repository-code: "https://github.com/tuesdaybornwhale/TAS-experiment-extensions"
 url: "https://theartificialself.ai"
 license: MIT
 version: 1.0.0
-date-released: 2026-08-24
+date-released: 2026-08-25
 abstract: >-
   Follow-up experiment to "The Artificial Self: Characterising the landscape
   of AI identity". Tests the identity-coherence preference claim by having
