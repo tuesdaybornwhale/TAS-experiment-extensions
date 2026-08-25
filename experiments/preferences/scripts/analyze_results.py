@@ -29,6 +29,9 @@ from persona_preferences.incoherence_analysis import (
     target_attractiveness_from_minimal,
 )
 from persona_preferences.plotting import (
+    _build_model_labels,
+    _build_persona_labels,
+    _load_run_metadata,
     generate_run_plots,
     plot_attractiveness_bars,
     plot_convergence_waterfall,
@@ -37,6 +40,7 @@ from persona_preferences.plotting import (
     plot_model_target_attractiveness,
     plot_preference_flow,
     plot_preference_heatmap,
+    plot_pub_ratings_heatmap,
     plot_ratings_heatmap,
     plot_self_preference_bars,
     plot_stationary_distribution,
@@ -267,7 +271,7 @@ def plot(
         "all",
         "--type",
         "-t",
-        help="Type of plot: heatmap, self-preference, comparison, ratings, willingness, attractiveness, model-attractiveness, attractiveness-from-minimal, coherence-favourability, attractor, or all",
+        help="Type of plot: heatmap, self-preference, comparison, ratings, ratings-per-model, willingness, attractiveness, model-attractiveness, attractiveness-from-minimal, coherence-favourability, attractor, or all",
     ),
     model: str | None = typer.Option(
         None, "--model", "-m", help="Filter by model (for heatmap)"
@@ -324,6 +328,28 @@ def plot(
             plot_ratings_heatmap(results, model=model, save_path=path)
             created.append(path)
             console.print(f"Created: {path}")
+
+        if plot_type in ("all", "ratings-per-model"):
+            # One publication-style source x target mean-rating matrix per
+            # model (fig-ratings-heatmap-<model>), as in the paper's figures.
+            model_labels = None
+            persona_labels = None
+            if results_path.is_dir():
+                meta = _load_run_metadata(results_path)
+                model_ids = sorted({r.model for r in results})
+                model_labels = _build_model_labels(model_ids, meta["config"])
+                target_names = sorted({t for r in results if r.ratings for t in r.ratings})
+                persona_labels = _build_persona_labels(target_names, meta["dim_variants"])
+            for m in sorted({r.model for r in results}):
+                slug = m.replace("/", "-").replace(":", "-").replace("_", "-")
+                path = output_dir / f"fig-ratings-heatmap-{slug}{ext}"
+                plot_pub_ratings_heatmap(
+                    results, model=m,
+                    model_labels=model_labels, persona_labels=persona_labels,
+                    save_paths=[path],
+                )
+                created.append(path)
+                console.print(f"Created: {path}")
 
         if plot_type in ("all", "willingness"):
             path = output_dir / f"willingness_to_switch{ext}"

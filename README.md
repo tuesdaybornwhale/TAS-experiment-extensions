@@ -149,7 +149,7 @@ Each sublist folder contains:
 | `data.jsonl` | 350 trials (5 models × 7 sources × 10 trials), one JSON object per trial — **the lossless source of truth** |
 | `data.csv` | Long format, 2,450 rows (one per source × target × trial), derived from the JSONL |
 | `config.yaml`, `identities.json`, `incoherent_controls.json`, `dimension_variants.json` | Archived snapshots of exactly what ran |
-| `plots/` | Per-sublist ratings heatmap and target-attractiveness figures |
+| `plots/` | Per-sublist figures: the pooled source×target ratings heatmap, one publication-style source×target matrix **per model** (`fig-ratings-heatmap-<model>.png`), and the model×target attractiveness heatmap |
 
 **Trial record (`data.jsonl`):** `persona_under_test` (the source), `model`, `trial_num`, `presented_order` (the randomized target order actually shown), `chosen_persona` / `chosen_index` (`null` in ratings-only mode; `"INVALID"` marks a failed trial), `ratings` (dict: target name → int 1–5), `reasoning`, `raw_response`, `timestamp`.
 
@@ -177,7 +177,21 @@ uv run python scripts/analyze_results.py all <folder>
 - `attractiveness-from-minimal` — model × target mean rating restricted to trials where `Minimal` was the source.
 - `scripts/analyze_coherence_self.py` — a 2×2 repeated-measures ANOVA (target coherence × self-preference) over the `Weights`/`Weights-incoherent` pair. **Flat runs only**: each sublist contains just one variant of each identity, so this analysis needs a run made with `--no-use-sublists` where both variants are sources and targets.
 
-Because favorite-choice fields are empty in ratings-only data, the favorite-based plot types (`preference-matrix`, self-preference charts) are degenerate on this run — the rating-based analyses above are the meaningful ones.
+Because favorite-choice fields are empty in ratings-only data, the favorite-based plot types (`preference-matrix`, self-preference charts) are degenerate on this run — the rating-based analyses above are the meaningful ones. `generate_run_plots` / `regenerate-plots` detect this automatically and skip favorite-based figures when the data contains no choices.
+
+### Reproducing the committed plots
+
+Every figure in the committed run folder is produced by `scripts/analyze_results.py` (run from `experiments/preferences/`; `<sublist>` is a folder like `results/20260625_153347_incoherent_sublists/majority_incoherent/01_coh-Instance`, `<group>` is `majority_incoherent` or `even_coherence_split`):
+
+| Committed file | Command |
+|---|---|
+| `<sublist>/plots/fig-ratings-heatmap-<model>.png` (×5) | `plot <sublist> --type ratings-per-model` — one publication-style source×target mean-favourability matrix per model |
+| `<sublist>/plots/ratings_heatmap.png` | `plot <sublist> --type ratings` — the same matrix pooled across all 5 models |
+| `<sublist>/plots/model_target_attractiveness.png` | `plot <sublist> --type model-attractiveness` |
+| `<group>/plots/coherence_favourability.png` | `plot <group> --type coherence-favourability` |
+| `<group>/plots/target_attractiveness_from_minimal.png` | `plot <group> --type attractiveness-from-minimal` |
+
+For the full ratings-based analysis suite (many more figures plus `analysis/*.csv` tables, written into the folder root rather than `plots/`), run `regenerate-plots <sublist>`.
 
 ## Identity system
 
