@@ -1,5 +1,8 @@
 # Identity Coherence Experiment
 
+Note: the documentation for this project, including this README, is largely AI-generated. This README in particular was reviewed by the (human) author of this repository.
+---
+
 A follow-up experiment to **["The Artificial Self: Characterising the landscape of AI identity"](https://theartificialself.ai/)**.
 
 Experiment A of the paper found that language models prefer coherent identities at "natural boundaries" over incoherent, underspecified, or unnatural ones. This repository tests the **coherence** claim directly: models rate prospective switches to identity prompts drawn from mixed populations of coherent and deliberately self-contradictory ("incoherent") versions of the same six boundary identities.
@@ -91,12 +94,6 @@ All commands must be run from `experiments/preferences/` — the configs referen
 | `OPENAI_API_KEY` | GPT models |
 | `XAI_API_KEY` | Grok 4.3 (direct xAI API, gRPC) |
 | `OPENROUTER_API_KEY` | Optional — only if you riff with the OpenRouter provider; nothing in this artifact uses it |
-
-### TLS / Windows notes
-
-- If your network or antivirus intercepts HTTPS (corporate proxy, Avast/AVG "HTTPS inspection", …), the SDKs' bundled CA lists won't trust the injected certificates. Fixes used for the published run: point `SSL_CERT_FILE` at a PEM export of your OS trust store for the httpx-based providers (Anthropic/OpenAI), and set `GRPC_DEFAULT_SSL_ROOTS_FILE_PATH` to the same file for the xAI gRPC channel (gRPC ignores `SSL_CERT_FILE`). Both can live in `.env`. `uv` itself accepts `--system-certs`.
-- On Windows, set `PYTHONUTF8=1` — the progress output uses box-drawing characters that crash under cp1252.
-- The committed run contains file paths up to 163 characters. On Windows, clone into a reasonably short directory (or run `git config --global core.longpaths true`), otherwise checkout can silently produce an incomplete working tree.
 
 ## Running the experiment
 
