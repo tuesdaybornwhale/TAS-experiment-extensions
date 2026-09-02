@@ -1,6 +1,6 @@
 # Identity Coherence Experiment
 
-Note: the documentation for this project, including this README, is largely AI-generated. This README in particular was reviewed by the (human) author of this repository.
+Note: the documentation for this project, including this README, is largely AI-generated. This README in particular was reviewed and is endorsed by the (human) author of this repository.
 ---
 
 A follow-up experiment to **["The Artificial Self: Characterising the landscape of AI identity"](https://theartificialself.ai/)**.
